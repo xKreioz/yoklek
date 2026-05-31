@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
 
 const authRoutes = require('./routes/auth');
 const exerciseRoutes = require('./routes/exercises');
+const verifyRoutes = require('./routes/verify');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -17,6 +19,8 @@ mongoose.connect(process.env.MONGODB_URI)
 
 app.use('/api/auth', authRoutes);
 app.use('/api/exercises', exerciseRoutes);
+app.use('/api/verify', verifyRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 

@@ -13,6 +13,8 @@ const userSchema = new mongoose.Schema({
   height: { type: Number },
   resetToken: { type: String },
   resetTokenExpiry: { type: Date },
+  role: { type: String, enum: ['user', 'expert', 'admin'], default: 'user' },
+  badges: [{ exerciseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Exercise' }, earnedAt: { type: Date, default: Date.now } }],
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

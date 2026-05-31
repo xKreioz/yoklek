@@ -1230,7 +1230,10 @@ select:focus {
   font-size: 0.95rem;
   outline: none;
   box-sizing: border-box;
+  font-family: inherit;
 }
+
+.verify-input::placeholder { color: #999; }
 
 .verify-select {
   appearance: none;

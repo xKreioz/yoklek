@@ -20,6 +20,7 @@ import { TopNavOnlyLayout } from "./components/TopNavOnlyLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import Admin from "./pages/Admin";
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/admin" element={<Admin />} />
 
         {/* Protected routes (with Layout) */}
         <Route element={<ProtectedRoute />}>
