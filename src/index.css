@@ -30,6 +30,12 @@ body {
   justify-content: center;
 }
 
+/* Admin layout overrides */
+#root:has(.adm-root) {
+  align-items: stretch;
+  justify-content: stretch;
+}
+
 /* Common Layout */
 .screen-container {
   display: flex;

@@ -104,17 +104,16 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
     submission.reviewedAt = new Date();
     await submission.save();
 
-    // Mark exercise as verified in library
-    await Exercise.findByIdAndUpdate(submission.exerciseId, { verified: true });
-
-    // Give badge to user
+    // Give badge to THIS user only (do NOT touch exercise.verified globally)
     const targetUser = await User.findById(submission.userId);
-    const alreadyHasBadge = targetUser.badges.some(
-      (b) => b.exerciseId.toString() === submission.exerciseId.toString()
-    );
-    if (!alreadyHasBadge) {
-      targetUser.badges.push({ exerciseId: submission.exerciseId });
-      await targetUser.save();
+    if (targetUser) {
+      const alreadyHasBadge = targetUser.badges.some(
+        (b) => b.exerciseId.toString() === submission.exerciseId.toString()
+      );
+      if (!alreadyHasBadge) {
+        targetUser.badges.push({ exerciseId: submission.exerciseId });
+        await targetUser.save();
+      }
     }
 
     res.json({ message: 'Approved successfully', submission });

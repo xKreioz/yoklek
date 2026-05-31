@@ -20,7 +20,12 @@ import { TopNavOnlyLayout } from "./components/TopNavOnlyLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import Admin from "./pages/Admin";
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/Dashboard";
+import AdminExpert from "./pages/admin/Expert";
+import AdminUser from "./pages/admin/User";
+import AdminContent from "./pages/admin/Content";
+import AdminModeration from "./pages/admin/Moderation";
 
 function App() {
   return (
@@ -32,7 +37,15 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/admin" element={<Admin />} />
+        {/* Admin (desktop) */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard"  element={<AdminDashboard />} />
+          <Route path="expert"     element={<AdminExpert />} />
+          <Route path="user"       element={<AdminUser />} />
+          <Route path="content"    element={<AdminContent />} />
+          <Route path="moderation" element={<AdminModeration />} />
+        </Route>
 
         {/* Protected routes (with Layout) */}
         <Route element={<ProtectedRoute />}>

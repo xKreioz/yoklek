@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Exercise = require('../models/Exercise');
 const ExpertApplication = require('../models/ExpertApplication');
 const VerificationSubmission = require('../models/VerificationSubmission');
+const WorkoutLog = require('../models/WorkoutLog');
 
 async function requireAdmin(req, res, next) {
   const user = await User.findById(req.user.userId).select('role');
@@ -28,8 +29,79 @@ router.get('/stats', authMiddleware, requireAdmin, async (req, res) => {
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get('/users', authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const users = await User.find().select('-password -resetToken -resetTokenExpiry').sort({ createdAt: -1 });
-    res.json(users);
+    const { search, page = 1, limit = 10, role, sort = 'newest' } = req.query;
+    const query = {};
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName:  { $regex: search, $options: 'i' } },
+        { email:     { $regex: search, $options: 'i' } },
+        { username:  { $regex: search, $options: 'i' } },
+      ];
+    }
+    if (role) query.role = role;
+    const sortMap = {
+      newest: { createdAt: -1 },
+      oldest: { createdAt:  1 },
+      az:     { firstName:  1 },
+      za:     { firstName: -1 },
+    };
+    const sortObj = sortMap[sort] || { createdAt: -1 };
+    const skip = (Number(page) - 1) * Number(limit);
+    const [users, total] = await Promise.all([
+      User.find(query).select('-password -resetToken -resetTokenExpiry')
+        .sort(sortObj).skip(skip).limit(Number(limit)),
+      User.countDocuments(query),
+    ]);
+    // attach workout count + last active per user
+    const userIds = users.map(u => u._id);
+    const logs = await WorkoutLog.aggregate([
+      { $match: { userId: { $in: userIds } } },
+      { $group: { _id: '$userId', count: { $sum: 1 }, lastDate: { $max: '$date' } } },
+    ]);
+    const logMap = {};
+    logs.forEach(l => { logMap[l._id.toString()] = l; });
+
+    const result = users.map(u => {
+      const log = logMap[u._id.toString()];
+      return {
+        ...u.toObject(),
+        workoutCount: log?.count || 0,
+        lastActive: log?.lastDate || null,
+      };
+    });
+    res.json({ users: result, total, pages: Math.ceil(total / Number(limit)) });
+  } catch (err) { res.status(500).json({ message: 'Server error', error: err.message }); }
+});
+
+// ── User detail: streak + workout logs ───────────────────────────────────────
+router.get('/users/:id/stats', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password -resetToken -resetTokenExpiry');
+    if (!user) return res.status(404).json({ message: 'Not found' });
+
+    // Last 90 days workout dates for streak calendar
+    const since = new Date(); since.setDate(since.getDate() - 90);
+    const logs = await WorkoutLog.find({ userId: req.params.id, date: { $gte: since } })
+      .sort({ date: -1 }).lean();
+
+    const activeDates = [...new Set(logs.map(l => l.date.toISOString().slice(0, 10)))];
+
+    // Recent 20 workout logs with exercises
+    const recent = await WorkoutLog.find({ userId: req.params.id })
+      .sort({ date: -1 }).limit(20).lean();
+
+    res.json({ user, activeDates, recentLogs: recent });
+  } catch (err) { res.status(500).json({ message: 'Server error' }); }
+});
+
+router.put('/users/:id/profile', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const allowed = ['firstName','lastName','username','email','birthDate','gender','weight','height'];
+    const update = {};
+    allowed.forEach(k => { if (req.body[k] !== undefined) update[k] = req.body[k]; });
+    const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password');
+    res.json(user);
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
 });
 
@@ -46,7 +118,7 @@ router.put('/users/:id/role', authMiddleware, requireAdmin, async (req, res) => 
 router.get('/expert-applications', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const apps = await ExpertApplication.find()
-      .populate('userId', 'firstName lastName email')
+      .populate('userId', 'firstName lastName email username birthDate gender weight height badges')
       .sort({ createdAt: -1 });
     res.json(apps);
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
@@ -74,8 +146,53 @@ router.put('/expert-applications/:id/reject', authMiddleware, requireAdmin, asyn
 // ── Exercises ─────────────────────────────────────────────────────────────────
 router.get('/exercises', authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const exercises = await Exercise.find().sort({ createdAt: -1 });
-    res.json(exercises);
+    const { search, page = 1, limit = 10, muscleGroup, status, sort = 'newest' } = req.query;
+    const query = {};
+    if (search) query.$or = [
+      { name:   { $regex: search, $options: 'i' } },
+      { nameEn: { $regex: search, $options: 'i' } },
+    ];
+    if (muscleGroup) query.muscleGroup = muscleGroup;
+    if (status === 'published') query.verified = true;
+    if (status === 'draft')     query.verified = false;
+    const sortMap = {
+      newest: { createdAt: -1 },
+      oldest: { createdAt:  1 },
+      az:     { name:  1 },
+      za:     { name: -1 },
+    };
+    const sortObj = sortMap[sort] || { createdAt: -1 };
+    const skip = (Number(page) - 1) * Number(limit);
+    const [exercises, total] = await Promise.all([
+      Exercise.find(query).sort(sortObj).skip(skip).limit(Number(limit)),
+      Exercise.countDocuments(query),
+    ]);
+    // count verified users per exercise from badges
+    const ids = exercises.map(e => e._id);
+    const badgeCounts = await require('../models/User').aggregate([
+      { $unwind: '$badges' },
+      { $match: { 'badges.exerciseId': { $in: ids } } },
+      { $group: { _id: '$badges.exerciseId', count: { $sum: 1 } } },
+    ]);
+    const badgeMap = {};
+    badgeCounts.forEach(b => { badgeMap[b._id.toString()] = b.count; });
+    const result = exercises.map(e => ({ ...e.toObject(), verifiedUsers: badgeMap[e._id.toString()] || 0 }));
+    res.json({ exercises: result, total, pages: Math.ceil(total / Number(limit)) });
+  } catch (err) { res.status(500).json({ message: 'Server error', error: err.message }); }
+});
+
+router.post('/exercises', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const ex = await Exercise.create({ ...req.body, verified: req.body.verified ?? false });
+    res.status(201).json(ex);
+  } catch (err) { res.status(500).json({ message: 'Server error', error: err.message }); }
+});
+
+router.put('/exercises/:id', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const ex = await Exercise.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!ex) return res.status(404).json({ message: 'Not found' });
+    res.json(ex);
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
 });
 
