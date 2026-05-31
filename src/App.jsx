@@ -17,6 +17,9 @@ import Verify from "./pages/Verify";
 import Statistics from "./pages/Statistics";
 import { Layout } from "./components/Layout";
 import { TopNavOnlyLayout } from "./components/TopNavOnlyLayout";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 function App() {
   return (
@@ -26,23 +29,27 @@ function App() {
         <Route path="/landing" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected routes (with Layout) */}
-        <Route element={<Layout />}>
-          <Route path="/home" element={<Home />} />
-          <Route path="/storage" element={<Storage />} />
-          <Route path="/record" element={<Record />} />
-          <Route path="/verify" element={<Verify />} />
-          <Route path="/statistics" element={<Statistics />} />
-        </Route>
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route path="/home" element={<Home />} />
+            <Route path="/storage" element={<Storage />} />
+            <Route path="/record" element={<Record />} />
+            <Route path="/verify" element={<Verify />} />
+            <Route path="/statistics" element={<Statistics />} />
+          </Route>
 
-        {/* Routes with TopNav only */}
-        <Route element={<TopNavOnlyLayout />}>
-          <Route path="/notifications" element={<Notification />} />
-        </Route>
+          {/* Routes with TopNav only */}
+          <Route element={<TopNavOnlyLayout />}>
+            <Route path="/notifications" element={<Notification />} />
+          </Route>
 
-        {/* Standalone Pages */}
-        <Route path="/profile" element={<Profile />} />
+          {/* Standalone Pages */}
+          <Route path="/profile" element={<Profile />} />
+        </Route>
 
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
