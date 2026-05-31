@@ -123,4 +123,55 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// Update profile (protected)
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    const { firstName, lastName, username, email, birthDate, gender, weight, height } = req.body;
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (email && email !== user.email) {
+      const exists = await User.findOne({ email });
+      if (exists) return res.status(409).json({ message: 'Email already in use' });
+      user.email = email;
+    }
+
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (username !== undefined) user.username = username;
+    if (birthDate !== undefined) user.birthDate = birthDate || null;
+    if (gender !== undefined) user.gender = gender;
+    if (weight !== undefined) user.weight = weight ? Number(weight) : null;
+    if (height !== undefined) user.height = height ? Number(height) : null;
+
+    await user.save();
+    const updated = user.toObject();
+    delete updated.password;
+    delete updated.resetToken;
+    delete updated.resetTokenExpiry;
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Change password (protected)
+router.put('/profile/password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Both passwords are required' });
+    }
+    const user = await User.findById(req.user.userId);
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) return res.status(401).json({ message: 'Current password is incorrect' });
+
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 module.exports = router;
