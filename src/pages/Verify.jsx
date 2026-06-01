@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle2, Clock, AlertCircle, Lock, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-const API = 'http://localhost:5000/api';
+import { API } from '../lib/api';
 const token = () => localStorage.getItem('token');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -29,8 +28,16 @@ function SubmitTab() {
   const [expanded, setExpanded] = useState({});
 
   useEffect(() => {
-    fetch(`${API}/exercises`)
-      .then(r => r.json()).then(setExercises).catch(() => {});
+    // Fetch exercises and user badges in parallel, then filter out already-verified ones
+    Promise.all([
+      fetch(`${API}/exercises`).then(r => r.json()),
+      fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()),
+    ]).then(([allExercises, user]) => {
+      const verifiedIds = new Set(
+        (user.badges || []).map(b => b.exerciseId?.toString())
+      );
+      setExercises(allExercises.filter(ex => !verifiedIds.has(ex._id)));
+    }).catch(() => {});
     loadHistory();
   }, []);
 

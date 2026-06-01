@@ -1,24 +1,23 @@
-import { useState } from 'react';
-
-export function Input({ type = "text", placeholder, onChange, style, ...props }) {
-  const [hasValue, setHasValue] = useState(false);
-
+export function Input({ type = "text", placeholder, onChange, style, value, defaultValue, ...props }) {
   const handleChange = (e) => {
-    setHasValue(!!e.target.value);
     if (onChange) onChange(e);
   };
 
-  const currentStyle = (type === "date" && !hasValue) 
-    ? { color: 'var(--text-muted)', ...style } 
-    : style;
+  // For date inputs: show muted color when empty (works for both controlled & uncontrolled)
+  const isEmpty = type === "date" && (value === '' || value === undefined);
+  const currentStyle = isEmpty ? { color: 'var(--text-muted)', ...style } : style;
+
+  const inputProps = value !== undefined
+    ? { value, onChange: handleChange }          // controlled
+    : { defaultValue, onChange: handleChange };  // uncontrolled
 
   return (
-    <input 
-      type={type} 
-      placeholder={placeholder} 
+    <input
+      type={type}
+      placeholder={placeholder}
       style={currentStyle}
-      onChange={handleChange}
-      {...props} 
+      {...inputProps}
+      {...props}
     />
   );
 }

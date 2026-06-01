@@ -16,6 +16,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Please fill all required fields' });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ message: 'Email already in use' });
@@ -27,7 +31,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName },
+      user: { id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -57,7 +61,7 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName },
+      user: { id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -80,7 +84,12 @@ router.post('/forgot-password', async (req, res) => {
     await user.save();
 
     const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
-    await sendResetEmail(email, resetLink);
+    try {
+      await sendResetEmail(email, resetLink);
+    } catch (mailErr) {
+      console.error('Mail error:', mailErr.message);
+      // Still respond OK — don't leak email existence, but log the error
+    }
 
     res.json({ message: 'If that email exists, a reset link has been sent.' });
   } catch (err) {
@@ -93,6 +102,8 @@ router.post('/reset-password', async (req, res) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ message: 'Token and password are required' });
+
+    if (password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' });
 
     const user = await User.findOne({
       resetToken: token,
@@ -126,7 +137,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 // Update profile (protected)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { firstName, lastName, username, email, birthDate, gender, weight, height } = req.body;
+    const { firstName, lastName, username, email, birthDate, gender, weight, height, goalDays } = req.body;
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -143,6 +154,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
     if (gender !== undefined) user.gender = gender;
     if (weight !== undefined) user.weight = weight ? Number(weight) : null;
     if (height !== undefined) user.height = height ? Number(height) : null;
+    if (goalDays !== undefined) user.goalDays = Number(goalDays) || 0;
 
     await user.save();
     const updated = user.toObject();
@@ -162,6 +174,9 @@ router.put('/profile/password', authMiddleware, async (req, res) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: 'Both passwords are required' });
     }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
     const user = await User.findById(req.user.userId);
     const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) return res.status(401).json({ message: 'Current password is incorrect' });
@@ -169,6 +184,28 @@ router.put('/profile/password', authMiddleware, async (req, res) => {
     user.password = newPassword;
     await user.save();
     res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Set / update goal weight for one exercise (upsert)
+router.put('/exercise-goal', authMiddleware, async (req, res) => {
+  try {
+    const { exerciseId, goalWeight } = req.body;
+    if (!exerciseId) return res.status(400).json({ message: 'exerciseId is required' });
+
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const existing = user.goals.find(g => g.exerciseId.toString() === exerciseId);
+    if (existing) {
+      existing.goalWeight = Number(goalWeight) || 0;
+    } else {
+      user.goals.push({ exerciseId, goalWeight: Number(goalWeight) || 0 });
+    }
+    await user.save();
+    res.json({ message: 'Goal updated', goals: user.goals });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

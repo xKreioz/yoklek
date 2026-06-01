@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, X, CheckCircle2 } from 'lucide-react';
 import Dropdown from './Dropdown';
-
-const API = 'http://localhost:5000/api';
+import { API } from '../../lib/api';
 const tk  = () => localStorage.getItem('token');
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' }) : '-';
 const timeAgo = (d) => {
@@ -184,49 +183,75 @@ function UserDetail({ userId, onClose }) {
 
       {/* Statistics */}
       <div className="adm-fields-card">
-        <h4 style={{ fontSize:'0.8rem', color:'#fff', marginBottom:12 }}>Statistics</h4>
-
-        <p style={{ fontSize:'0.7rem', color:'#666', marginBottom:8 }}>Streak</p>
+        <h4 style={{ fontSize:'0.8rem', color:'#fff', marginBottom:12 }}>Activity</h4>
         <StreakCalendar activeDates={activeDates} />
-
-        {Object.keys(exerciseMap).length > 0 && (
-          <>
-            <p style={{ fontSize:'0.7rem', color:'#666', marginTop:16, marginBottom:8 }}>Workout</p>
-            {Object.entries(exerciseMap).map(([name, data]) => (
-              <div key={name} style={{ background:'#111', borderRadius:8, padding:'10px', marginBottom:8 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                  <span style={{ fontSize:'0.82rem', fontWeight:600, color:'#fff' }}>{name}</span>
-                  <span style={{ fontSize:'0.72rem', color:'#666' }}>Goal: {data.goal}</span>
-                </div>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.75rem' }}>
-                  <thead>
-                    <tr style={{ color:'#555', borderBottom:'1px solid #1e1e1e' }}>
-                      <th style={{ textAlign:'left', padding:'4px 6px', fontWeight:500 }}>date</th>
-                      <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:500 }}>set</th>
-                      <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:500 }}>reps</th>
-                      <th style={{ textAlign:'right', padding:'4px 6px', fontWeight:500 }}>weight(kg)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.entries.slice(0, 6).map((e, i) => (
-                      <tr key={i} style={{ borderBottom:'1px solid #1a1a1a' }}>
-                        <td style={{ padding:'5px 6px', color:'#888' }}>{fmt(e.date)}</td>
-                        <td style={{ padding:'5px 6px', textAlign:'center', color:'#c0392b', fontWeight:600 }}>x3</td>
-                        <td style={{ padding:'5px 6px', textAlign:'center', color:'#ccc' }}>{e.reps}</td>
-                        <td style={{ padding:'5px 6px', textAlign:'right', color:'#ccc' }}>{e.weight}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-          </>
-        )}
-
-        {Object.keys(exerciseMap).length === 0 && (
-          <p style={{ color:'#444', fontSize:'0.8rem', textAlign:'center', marginTop:12 }}>No workout logs yet</p>
-        )}
       </div>
+
+      {/* Exercise Summary Cards */}
+      {Object.keys(exerciseMap).length > 0 ? (
+        <div className="adm-fields-card">
+          <h4 style={{ fontSize:'0.8rem', color:'#fff', marginBottom:12 }}>Exercise Summary</h4>
+          {Object.entries(exerciseMap).map(([name, data]) => {
+            const maxWeight  = data.entries.length > 0 ? Math.max(...data.entries.map(e => e.weight || 0)) : 0;
+            const totalSets  = data.entries.length;
+            const totalReps  = data.entries.reduce((s, e) => s + (e.reps || 0), 0);
+
+            // Group entries by date → recent sessions
+            const byDate = {};
+            data.entries.forEach(e => {
+              const d = fmt(e.date);
+              if (!byDate[d]) byDate[d] = [];
+              byDate[d].push(e);
+            });
+            const sessions = Object.entries(byDate).slice(0, 3);
+
+            return (
+              <div key={name} style={{ background:'#111', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
+                {/* Header */}
+                <div style={{ marginBottom:10 }}>
+                  <span style={{ fontSize:'0.85rem', fontWeight:700, color:'#fff' }}>{name}</span>
+                </div>
+
+                {/* 3 stat pills */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
+                  {[
+                    { label:'Best', value:`${maxWeight} kg`, color:'#c0392b' },
+                    { label:'Sets', value:totalSets, color:'#fff' },
+                    { label:'Reps', value:totalReps, color:'#fff' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ background:'#1a1a1a', borderRadius:8, padding:'6px 8px', textAlign:'center' }}>
+                      <div style={{ fontSize:'0.6rem', color:'#555', marginBottom:2 }}>{label}</div>
+                      <div style={{ fontSize:'0.88rem', fontWeight:700, color }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Recent sessions */}
+                {sessions.length > 0 && (
+                  <div style={{ borderTop:'1px solid #1e1e1e', paddingTop:8 }}>
+                    <span style={{ fontSize:'0.6rem', color:'#555', display:'block', marginBottom:6 }}>Recent sessions</span>
+                    {sessions.map(([date, sets]) => {
+                      const best     = Math.max(...sets.map(s => s.weight || 0));
+                      const repTotal = sets.reduce((s, e) => s + (e.reps || 0), 0);
+                      return (
+                        <div key={date} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid #161616' }}>
+                          <span style={{ fontSize:'0.72rem', color:'#666' }}>{date}</span>
+                          <span style={{ fontSize:'0.72rem', color:'#888' }}>{sets.length} sets · {repTotal} reps</span>
+                          <span style={{ fontSize:'0.72rem', color:'#c0392b', fontWeight:700 }}>{best} kg</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="adm-fields-card">
+          <p style={{ color:'#444', fontSize:'0.8rem', textAlign:'center' }}>No workout logs yet</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -254,21 +279,22 @@ export default function User() {
   const [sort,   setSort]   = useState('newest');
   const [selected, setSelected] = useState(null);
 
-  const load = useCallback((p = 1, q = search, r = role, s = sort) => {
+  const fetchUsers = useCallback((p, q, r, s) => {
     const params = new URLSearchParams({ page: p, limit: 10, sort: s });
     if (q) params.set('search', q);
     if (r) params.set('role', r);
     fetch(`${API}/admin/users?${params}`, { headers: { Authorization: `Bearer ${tk()}` } })
-      .then(r => r.json())
+      .then(res => res.json())
       .then(d => { setUsers(d.users || []); setTotal(d.total || 0); setPages(d.pages || 1); })
       .catch(() => {});
-  }, [search, role, sort]);
+  }, []); // no deps — all args passed explicitly
 
-  useEffect(() => { load(1, search, role, sort); }, [search, role, sort]);
+  useEffect(() => { fetchUsers(1, search, role, sort); }, [search, role, sort, fetchUsers]);
 
   const handleSearch = (e) => { setSearch(e.target.value); setPage(1); };
 
-  const goPage = (p) => { if (p < 1 || p > pages) return; setPage(p); load(p, search, role, sort); };
+  const goPage = (p) => { if (p < 1 || p > pages) return; setPage(p); fetchUsers(p, search, role, sort); };
+  const load = (p = page) => fetchUsers(p, search, role, sort);
 
   const pageNums = () => {
     if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
@@ -318,7 +344,7 @@ export default function User() {
               <tr style={{ background:'#1e1e1e', borderBottom:'1px solid #252525' }}>
                 <th style={{ textAlign:'left', padding:'12px 16px', fontWeight:500, color:'#888' }}>Username</th>
                 {!selected && <>
-                  <th style={{ textAlign:'center', padding:'12px 8px', fontWeight:500, color:'#888' }}>Streak</th>
+                  <th style={{ textAlign:'center', padding:'12px 8px', fontWeight:500, color:'#888' }}>Badges</th>
                   <th style={{ textAlign:'center', padding:'12px 8px', fontWeight:500, color:'#888' }}>Workouts</th>
                   <th style={{ textAlign:'center', padding:'12px 8px', fontWeight:500, color:'#888' }}>Join Date</th>
                   <th style={{ textAlign:'center', padding:'12px 8px', fontWeight:500, color:'#888' }}>Last Active</th>
@@ -339,13 +365,25 @@ export default function User() {
                         {u.firstName?.charAt(0)}
                       </div>
                       <div>
-                        <div style={{ color:'#fff', fontWeight:500 }}>{u.firstName} {u.lastName}</div>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ color:'#fff', fontWeight:500 }}>{u.firstName} {u.lastName}</span>
+                          {u.role === 'expert' && (
+                            <span style={{ fontSize:'0.62rem', padding:'2px 7px', borderRadius:20, background:'#1a4731', color:'#48bb78', fontWeight:700 }}>Expert</span>
+                          )}
+                          {u.role === 'admin' && (
+                            <span style={{ fontSize:'0.62rem', padding:'2px 7px', borderRadius:20, background:'#2d1a3d', color:'#b794f4', fontWeight:700 }}>Admin</span>
+                          )}
+                        </div>
                         {!selected && <div style={{ fontSize:'0.7rem', color:'#555' }}>{u.email}</div>}
                       </div>
                     </div>
                   </td>
                   {!selected && <>
-                    <td style={{ textAlign:'center', color:'#aaa', padding:'12px 8px' }}>—</td>
+                    <td style={{ textAlign:'center', padding:'12px 8px' }}>
+                      {u.badges?.length > 0
+                        ? <span style={{ fontSize:'0.75rem', color:'#48bb78' }}>🏅 {u.badges.length}</span>
+                        : <span style={{ color:'#444' }}>—</span>}
+                    </td>
                     <td style={{ textAlign:'center', color:'#aaa', padding:'12px 8px' }}>{u.workoutCount}</td>
                     <td style={{ textAlign:'center', color:'#aaa', padding:'12px 8px' }}>{fmt(u.createdAt)}</td>
                     <td style={{ textAlign:'center', color:'#aaa', padding:'12px 8px' }}>{timeAgo(u.lastActive)}</td>

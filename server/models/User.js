@@ -14,7 +14,9 @@ const userSchema = new mongoose.Schema({
   resetToken: { type: String },
   resetTokenExpiry: { type: Date },
   role: { type: String, enum: ['user', 'expert', 'admin'], default: 'user' },
+  goalDays: { type: Number, default: 0 },
   badges: [{ exerciseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Exercise' }, earnedAt: { type: Date, default: Date.now } }],
+  goals: [{ exerciseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Exercise' }, goalWeight: { type: Number } }],
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

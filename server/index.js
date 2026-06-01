@@ -3,10 +3,11 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 
-const authRoutes = require('./routes/auth');
+const authRoutes     = require('./routes/auth');
 const exerciseRoutes = require('./routes/exercises');
-const verifyRoutes = require('./routes/verify');
-const adminRoutes = require('./routes/admin');
+const verifyRoutes   = require('./routes/verify');
+const adminRoutes    = require('./routes/admin');
+const workoutRoutes  = require('./routes/workoutlog');
 
 const app = express();
 
@@ -17,10 +18,11 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
   .catch((err) => console.error('MongoDB error:', err));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/exercises', exerciseRoutes);
-app.use('/api/verify', verifyRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/auth',        authRoutes);
+app.use('/api/exercises',  exerciseRoutes);
+app.use('/api/verify',     verifyRoutes);
+app.use('/api/admin',      adminRoutes);
+app.use('/api/workoutlogs', workoutRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 

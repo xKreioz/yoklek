@@ -1,17 +1,32 @@
 import { useState, useEffect } from 'react';
 import { Search, CheckCircle2, AlertTriangle, X, ChevronRight } from 'lucide-react';
+import { API } from '../lib/api';
+const tk  = () => localStorage.getItem('token');
 
 const categories = ['All', 'Arm', 'Chest', 'Leg', 'Back', 'Shoulder'];
 
 const difficultyColor = { beginner: '#48bb78', intermediate: '#ed8936', advanced: '#e53e3e' };
 
 function Storage() {
-  const [exercises, setExercises] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [exercises,    setExercises]    = useState([]);
+  const [loading,      setLoading]      = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selected, setSelected] = useState(null);
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [selected,     setSelected]     = useState(null);
+  const [myBadges,     setMyBadges]     = useState(new Set()); // Set of exerciseId strings
+
+  // Fetch user's earned badges once
+  useEffect(() => {
+    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${tk()}` } })
+      .then(r => r.json())
+      .then(user => {
+        if (Array.isArray(user.badges)) {
+          setMyBadges(new Set(user.badges.map(b => b.exerciseId?.toString())));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -20,7 +35,7 @@ function Storage() {
     if (verifiedOnly) params.set('verified', 'true');
 
     setLoading(true);
-    fetch(`http://localhost:5000/api/exercises?${params}`)
+    fetch(`${API}/exercises?${params}`)
       .then((r) => r.json())
       .then((data) => { setExercises(data); setLoading(false); })
       .catch(() => setLoading(false));
@@ -78,7 +93,7 @@ function Storage() {
                   <span style={{ fontSize: '0.65rem', color: difficultyColor[ex.difficulty], fontWeight: 600 }}>
                     {ex.difficulty}
                   </span>
-                  {ex.verified && (
+                  {myBadges.has(ex._id) && (
                     <span className="tag verified-tag">verified <CheckCircle2 size={12} /></span>
                   )}
                 </div>
@@ -91,16 +106,17 @@ function Storage() {
 
       {/* Detail Modal */}
       {selected && (
-        <ExerciseModal exercise={selected} onClose={() => setSelected(null)} />
+        <ExerciseModal exercise={selected} onClose={() => setSelected(null)} isVerified={myBadges.has(selected._id)} />
       )}
     </div>
   );
 }
 
-function ExerciseModal({ exercise, onClose }) {
+function ExerciseModal({ exercise, onClose, isVerified }) {
   return (
     <div className="full-screen-modal">
       <div className="modal-header">
+        <div style={{ width: '2.5rem', flexShrink: 0 }} />
         <h2 className="modal-title">{exercise.name}</h2>
         <button className="close-btn" onClick={onClose}><X size={24} /></button>
       </div>
@@ -128,7 +144,7 @@ function ExerciseModal({ exercise, onClose }) {
           <span style={{ fontSize: '0.7rem', color: difficultyColor[exercise.difficulty], fontWeight: 700, textTransform: 'capitalize' }}>
             {exercise.difficulty}
           </span>
-          {exercise.verified && (
+          {isVerified && (
             <span className="modal-verified-tag">verified <CheckCircle2 size={14} /></span>
           )}
         </div>

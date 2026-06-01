@@ -16,13 +16,14 @@ async function requireAdmin(req, res, next) {
 // ── Stats overview ────────────────────────────────────────────────────────────
 router.get('/stats', authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const [users, exercises, pendingSubmissions, pendingExperts] = await Promise.all([
+    const [users, exercises, pendingSubmissions, pendingExpertApps, totalExperts] = await Promise.all([
       User.countDocuments(),
       Exercise.countDocuments(),
       VerificationSubmission.countDocuments({ status: 'pending' }),
       ExpertApplication.countDocuments({ status: 'pending' }),
+      User.countDocuments({ role: 'expert' }),
     ]);
-    res.json({ users, exercises, pendingSubmissions, pendingExperts });
+    res.json({ users, exercises, pendingSubmissions, pendingExperts: pendingExpertApps, totalExperts });
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
 });
 
@@ -169,7 +170,7 @@ router.get('/exercises', authMiddleware, requireAdmin, async (req, res) => {
     ]);
     // count verified users per exercise from badges
     const ids = exercises.map(e => e._id);
-    const badgeCounts = await require('../models/User').aggregate([
+    const badgeCounts = await User.aggregate([
       { $unwind: '$badges' },
       { $match: { 'badges.exerciseId': { $in: ids } } },
       { $group: { _id: '$badges.exerciseId', count: { $sum: 1 } } },

@@ -1,11 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Search, SlidersHorizontal, ChevronLeft, ChevronRight,
-  Plus, Pencil, XCircle, Play, RotateCcw, X, AlertTriangle, CheckCircle2,
+  Plus, Pencil, XCircle, Play, RotateCcw, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
 import Dropdown from './Dropdown';
-
-const API  = 'http://localhost:5000/api';
+import { API } from '../../lib/api';
 const tk   = () => localStorage.getItem('token');
 const CATS = ['Arm','Chest','Leg','Back','Shoulder'];
 
@@ -123,24 +122,21 @@ function ExerciseForm({ initial, onBack, onSaved }) {
   });
   const [saving, setSaving]   = useState(false);
   const [error,  setError]    = useState('');
-  const [catChips, setCatChips] = useState(
-    initial ? [initial.muscleGroup] : []
-  );
+  const [catChips,    setCatChips]    = useState(initial?.muscleGroup ? [initial.muscleGroup] : []);
+  const [showCatPick, setShowCatPick] = useState(false);
+  const catRef = useRef(null);
 
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  useEffect(() => {
+    const close = e => { if (catRef.current && !catRef.current.contains(e.target)) setShowCatPick(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const set    = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const toggle = k => () => setForm(f => ({ ...f, [k]: !f[k] }));
 
-  const addCat = () => {
-    const next = CATS.find(c => !catChips.includes(c));
-    if (next) setCatChips(p => [...p, next]);
-  };
+  const addCat    = (c) => { if (!catChips.includes(c)) setCatChips(p => [...p, c]); setShowCatPick(false); };
   const removeCat = (c) => setCatChips(p => p.filter(x => x !== c));
-  const cycleCat  = (c) => {
-    const idx = CATS.indexOf(c);
-    const next = CATS[(idx + 1) % CATS.length];
-    setCatChips(p => p.map(x => x === c ? next : x));
-    if (catChips.length === 1) setForm(f => ({ ...f, muscleGroup: next }));
-  };
 
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Name is required'); return; }
@@ -192,11 +188,6 @@ function ExerciseForm({ initial, onBack, onSaved }) {
               </button>
             )}
           </div>
-          <div style={{ display:'flex',flexDirection:'column',gap:6 }}>
-            <button onClick={addCat} style={{ width:36,height:36,borderRadius:'50%',background:'#252525',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#aaa' }}>
-              <Plus size={18}/>
-            </button>
-          </div>
         </div>
 
         {/* Form fields */}
@@ -205,6 +196,9 @@ function ExerciseForm({ initial, onBack, onSaved }) {
           <FInput label="ชื่อท่า *" value={form.name} onChange={set('name')} placeholder="ชื่อท่า" />
           <FInput label="ชื่อภาษาอังกฤษ" value={form.nameEn} onChange={set('nameEn')} placeholder="Exercise name (EN)" />
           <FInput label="Image URL" value={form.imageUrl} onChange={set('imageUrl')} placeholder="https://..." />
+
+          <FTextarea label="คำอธิบาย" value={form.description} onChange={set('description')}
+            placeholder="คำอธิบายโดยย่อของท่าออกกำลังกาย..." rows={2} />
 
           <FTextarea label="วิธีเล่น *" value={form.steps} onChange={set('steps')}
             placeholder="พิมพ์ทีละขั้นตอน แต่ละบรรทัด = 1 ขั้นตอน" rows={4} />
@@ -218,20 +212,41 @@ function ExerciseForm({ initial, onBack, onSaved }) {
             <label style={{ fontSize:'0.7rem',color:'#666',display:'block',marginBottom:6 }}>ประเภท</label>
             <div style={{ display:'flex',flexWrap:'wrap',gap:6,alignItems:'center' }}>
               {catChips.map(c => (
-                <div key={c} style={{ display:'flex',alignItems:'center',gap:4 }}>
-                  <button onClick={() => cycleCat(c)}
-                    style={{ padding:'5px 14px',background:'#c0392b',border:'none',borderRadius:20,color:'#fff',fontSize:'0.78rem',fontWeight:600,cursor:'pointer' }}>
+                <div key={c} style={{ display:'flex',alignItems:'center',gap:2 }}>
+                  <span style={{ padding:'5px 14px',background:'#c0392b',borderRadius:20,color:'#fff',fontSize:'0.78rem',fontWeight:600 }}>
                     {c}
-                  </button>
+                  </span>
                   <button onClick={() => removeCat(c)}
-                    style={{ background:'none',border:'none',color:'#555',cursor:'pointer',padding:0,display:'flex' }}>
-                    <XCircle size={16}/>
+                    style={{ background:'none',border:'none',color:'#666',cursor:'pointer',padding:'2px',display:'flex' }}>
+                    <XCircle size={15}/>
                   </button>
                 </div>
               ))}
-              <button onClick={addCat} style={{ width:28,height:28,borderRadius:'50%',background:'#252525',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#888' }}>
-                <Plus size={14}/>
-              </button>
+
+              {/* Category picker */}
+              <div ref={catRef} style={{ position:'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCatPick(v => !v)}
+                  style={{ width:28,height:28,borderRadius:'50%',background:'#252525',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#888' }}>
+                  <Plus size={14}/>
+                </button>
+                {showCatPick && (
+                  <div style={{ position:'absolute',top:32,left:0,zIndex:99,background:'#1e1e1e',border:'1px solid #2a2a2a',borderRadius:8,padding:4,minWidth:130,boxShadow:'0 8px 24px rgba(0,0,0,0.5)' }}>
+                    {CATS.filter(c => !catChips.includes(c)).map(c => (
+                      <button key={c} onClick={() => addCat(c)}
+                        style={{ display:'block',width:'100%',padding:'7px 12px',background:'none',border:'none',color:'#ccc',fontSize:'0.82rem',cursor:'pointer',textAlign:'left',borderRadius:6 }}
+                        onMouseEnter={e=>e.target.style.background='#252525'}
+                        onMouseLeave={e=>e.target.style.background='none'}>
+                        {c}
+                      </button>
+                    ))}
+                    {CATS.filter(c => !catChips.includes(c)).length === 0 && (
+                      <p style={{ color:'#555',fontSize:'0.75rem',padding:'8px 12px',margin:0 }}>All added</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -299,7 +314,7 @@ export default function Content() {
   const [view,   setView]   = useState(null);
   const [delId,  setDelId]  = useState(null);
 
-  const load = useCallback((p = 1, q = search, m = muscle, st = status, so = sort) => {
+  const fetchExercises = useCallback((p, q, m, st, so) => {
     const params = new URLSearchParams({ page: p, limit: 10, sort: so });
     if (q)  params.set('search', q);
     if (m)  params.set('muscleGroup', m);
@@ -308,16 +323,17 @@ export default function Content() {
       .then(r => r.json())
       .then(d => { setExercises(d.exercises||[]); setTotal(d.total||0); setPages(d.pages||1); })
       .catch(() => {});
-  }, [search, muscle, status, sort]);
+  }, []); // no deps — all args passed explicitly
 
-  useEffect(() => { load(1, search, muscle, status, sort); }, [search, muscle, status, sort]);
+  useEffect(() => { fetchExercises(1, search, muscle, status, sort); }, [search, muscle, status, sort, fetchExercises]);
 
-  const goPage = p => { if (p<1||p>pages) return; setPage(p); load(p,search,muscle,status,sort); };
+  const load  = (p = page) => fetchExercises(p, search, muscle, status, sort);
+  const goPage = p => { if (p<1||p>pages) return; setPage(p); fetchExercises(p,search,muscle,status,sort); };
 
   const handleDelete = async (id) => {
     await fetch(`${API}/admin/exercises/${id}`, { method:'DELETE', headers:{ Authorization:`Bearer ${tk()}` } });
     setDelId(null);
-    load(page, search, muscle, status, sort);
+    fetchExercises(page, search, muscle, status, sort);
   };
 
   const pageNums = () => {
@@ -344,7 +360,7 @@ export default function Content() {
           initial={view.mode==='add' ? null : view.ex}
           onBack={() => view.mode==='add' ? setView(null) : setView({mode:'view',ex:view.ex})}
           onSaved={(updated) => {
-            load(page,search);
+            fetchExercises(page, search, muscle, status, sort);
             setView({mode:'view',ex:updated});
           }}
         />
@@ -428,14 +444,40 @@ export default function Content() {
                 <td style={{ textAlign:'center',color:'#aaa',padding:'12px 8px' }} onClick={() => setView({mode:'view',ex})}>
                   {ex.verifiedUsers}
                 </td>
-                <td style={{ textAlign:'center',padding:'12px 8px' }} onClick={() => setView({mode:'view',ex})}>
-                  <span style={{
-                    padding:'3px 10px',borderRadius:20,fontSize:'0.72rem',fontWeight:600,
-                    background: ex.verified ? '#1a4731' : '#252525',
-                    color:      ex.verified ? '#48bb78' : '#888',
-                  }}>
-                    {ex.verified ? 'Published' : 'Draft'}
-                  </span>
+                <td style={{ textAlign:'center',padding:'12px 8px' }}>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      // Optimistic update — show new state immediately
+                      setExercises(prev => prev.map(e =>
+                        e._id === ex._id ? { ...e, verified: !e.verified } : e
+                      ));
+                      const res = await fetch(`${API}/admin/exercises/${ex._id}/toggle-verified`, {
+                        method: 'PUT', headers: { Authorization: `Bearer ${tk()}` },
+                      });
+                      if (!res.ok) {
+                        // Revert if request failed
+                        setExercises(prev => prev.map(e =>
+                          e._id === ex._id ? { ...e, verified: ex.verified } : e
+                        ));
+                      } else {
+                        // Clear status filter so user can see the updated exercise in the list
+                        setStatus('');
+                        setTimeout(() => fetchExercises(page, search, muscle, '', sort), 600);
+                      }
+                    }}
+                    title="คลิกเพื่อเปลี่ยนสถานะ"
+                    style={{ padding:'3px 10px',borderRadius:20,fontSize:'0.72rem',fontWeight:600,
+                      border: ex.verified ? '1px solid #48bb78' : '1px solid #555',
+                      cursor:'pointer',
+                      background: ex.verified ? '#1a4731' : '#2a2a2a',
+                      color:      ex.verified ? '#48bb78' : '#aaa',
+                      display:'flex', alignItems:'center', gap:4,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
+                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                    {ex.verified ? '● Published' : '○ Draft'}
+                  </button>
                 </td>
                 <td style={{ padding:'12px 8px',textAlign:'center' }}>
                   <div style={{ display:'flex',justifyContent:'center',gap:6 }}>

@@ -18,6 +18,7 @@ import Statistics from "./pages/Statistics";
 import { Layout } from "./components/Layout";
 import { TopNavOnlyLayout } from "./components/TopNavOnlyLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AdminRoute } from "./components/AdminRoute";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -37,14 +38,16 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        {/* Admin (desktop) */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="dashboard"  element={<AdminDashboard />} />
-          <Route path="expert"     element={<AdminExpert />} />
-          <Route path="user"       element={<AdminUser />} />
-          <Route path="content"    element={<AdminContent />} />
-          <Route path="moderation" element={<AdminModeration />} />
+        {/* Admin (desktop) — requires login + admin role */}
+        <Route element={<AdminRoute />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="dashboard"  element={<AdminDashboard />} />
+            <Route path="expert"     element={<AdminExpert />} />
+            <Route path="user"       element={<AdminUser />} />
+            <Route path="content"    element={<AdminContent />} />
+            <Route path="moderation" element={<AdminModeration />} />
+          </Route>
         </Route>
 
         {/* Protected routes (with Layout) */}

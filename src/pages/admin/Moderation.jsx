@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
 
-const API = 'http://localhost:5000/api';
+import { API } from '../../lib/api';
 const token = () => localStorage.getItem('token');
 
 const statusColor = { pending: '#ed8936', approved: '#48bb78', rejected: '#e53e3e' };

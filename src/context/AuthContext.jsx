@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { API } from '../lib/api';
 
 const AuthContext = createContext(null);
 
@@ -11,7 +12,7 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('token');
     if (!token) return;
     try {
-      const res = await fetch('http://localhost:5000/api/auth/me', {
+      const res = await fetch(`${API}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -34,7 +35,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
-    const res = await fetch('http://localhost:5000/api/auth/login', {
+    const res = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -48,7 +49,7 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (formData) => {
-    const res = await fetch('http://localhost:5000/api/auth/register', {
+    const res = await fetch(`${API}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData),

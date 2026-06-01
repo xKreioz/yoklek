@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
-
-const API = 'http://localhost:5000/api';
+import { API } from '../../lib/api';
 const token = () => localStorage.getItem('token');
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ users: 0, exercises: 0, pendingSubmissions: 0, pendingExperts: 0 });
+  const [stats, setStats] = useState({ users: 0, exercises: 0, pendingSubmissions: 0, pendingExperts: 0, totalExperts: 0 });
   const [recentApps, setRecentApps] = useState([]);
 
   useEffect(() => {
@@ -28,9 +27,10 @@ export default function Dashboard() {
       {/* Stats */}
       <div className="adm-stats">
         <StatCard label="Total Users"              value={stats.users}            sub="+0% from last month" />
-        <StatCard label="Active Users"             value={stats.users}            sub="+0% from last month" />
-        <StatCard label="Total Expert"             value={stats.pendingExperts}   sub="+0% from last month" />
-        <StatCard label="Trainer request pending..." value={stats.pendingExperts}
+        <StatCard label="Total Exercises"          value={stats.exercises}        sub="exercises in system" />
+        <StatCard label="Total Expert"             value={stats.totalExperts}     sub="users with expert role" />
+        <StatCard label="Pending Submissions"      value={stats.pendingSubmissions} sub="awaiting expert review" color="#1976D2" />
+        <StatCard label="Trainer request pending" value={stats.pendingExperts}
           action="approve →" onAction={() => navigate('/admin/expert')} color="#e0a020" />
       </div>
 

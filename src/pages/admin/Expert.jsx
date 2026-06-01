@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Search, AlertCircle, CheckCircle2, XCircle, Play, Image, Link2 } from 'lucide-react';
-
-const API = 'http://localhost:5000/api';
+import { API } from '../../lib/api';
 const token = () => localStorage.getItem('token');
 
 function isYouTube(url) {
