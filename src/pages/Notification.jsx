@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Bell, CheckCircle2, XCircle, Award, Flame, Zap, Star } from 'lucide-react';
+import { ChevronLeft, Bell, CheckCircle2, XCircle, Award, Flame, Zap, Star, CheckCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API } from '../lib/api';
 
@@ -75,7 +75,18 @@ export default function Notification() {
           <ChevronLeft size={24} />
         </button>
         <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Notification</h2>
-        <div style={{ width: 24 }} />
+        <button
+          onClick={markAllRead}
+          disabled={!notifications.some(n => !n.read)}
+          title="อ่านทั้งหมด"
+          style={{
+            background: 'none', border: 'none', padding: 0, display: 'flex',
+            cursor: notifications.some(n => !n.read) ? 'pointer' : 'default',
+            color: notifications.some(n => !n.read) ? '#fff' : '#444',
+          }}
+        >
+          <CheckCheck size={20} />
+        </button>
       </div>
 
       {/* Body */}
