@@ -6,7 +6,7 @@ export function Layout() {
   return (
     <div className="app-layout">
       <TopNav />
-      <div className="scrollable-content" style={{ paddingTop: '80px' }}>
+      <div className="scrollable-content" style={{ paddingTop: '80px', paddingBottom: '80px' }}>
         <Outlet />
       </div>
       <Navbar />

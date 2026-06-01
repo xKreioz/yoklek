@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Edit2, EyeOff, Eye, Check, X } from 'lucide-react';
+import { ChevronLeft, Edit2, Check, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API } from '../lib/api';
 
@@ -19,7 +19,6 @@ function Profile() {
   });
 
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '' });
-  const [showPwSection, setShowPwSection] = useState(false);
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
 
@@ -70,7 +69,12 @@ function Profile() {
     }
   };
 
-  const handleCancel = () => { setIsEditing(false); setError(''); };
+  const handleCancel = () => {
+    setIsEditing(false);
+    setError('');
+    setPwForm({ currentPassword: '', newPassword: '' });
+    setPwError('');
+  };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -175,25 +179,16 @@ function Profile() {
         {/* Password row */}
         <div className="form-field">
           <label>Password</label>
-          <div className="input-with-icon">
-            <input
-              type="password"
-              value="••••••••••••"
-              readOnly
-              style={{ cursor: 'default' }}
-            />
-            <button
-              type="button"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}
-              onClick={() => setShowPwSection(!showPwSection)}
-            >
-              {showPwSection ? <Eye size={18} className="input-icon" /> : <EyeOff size={18} className="input-icon" />}
-            </button>
-          </div>
+          <input
+            type="password"
+            value="••••••••••••"
+            readOnly
+            style={{ cursor: 'default' }}
+          />
         </div>
 
-        {/* Change password sub-form */}
-        {showPwSection && (
+        {/* Change password sub-form — เปิดเมื่อกดแก้ไข */}
+        {isEditing && (
           <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
             <div className="form-field">
               <label>Current Password</label>
