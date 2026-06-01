@@ -17,7 +17,7 @@ export default function Expert() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [evTab, setEvTab] = useState('video');
-  const [acting, setActing] = useState(false);
+  const [acting, setActing] = useState('');
 
   const load = () => {
     fetch(`${API}/admin/expert-applications`, { headers: { Authorization: `Bearer ${token()}` } })
@@ -38,12 +38,12 @@ export default function Expert() {
   });
 
   const act = async (id, action) => {
-    setActing(true);
+    setActing(id + action);
     await fetch(`${API}/admin/expert-applications/${id}/${action}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
     });
-    setActing(false);
+    setActing('');
     setSelected(null);
     load();
   };
@@ -155,11 +155,11 @@ export default function Expert() {
               {/* Actions — only show for pending */}
               {selected.status === 'pending' && (
                 <div className="adm-actions">
-                  <button className="adm-btn-reject" disabled={acting} onClick={() => act(selected._id, 'reject')}>
-                    Reject
+                  <button className="adm-btn-reject" disabled={!!acting} onClick={() => act(selected._id, 'reject')}>
+                    {acting === selected._id + 'reject' ? 'Processing...' : 'Reject'}
                   </button>
-                  <button className="adm-btn-approve" disabled={acting} onClick={() => act(selected._id, 'approve')}>
-                    {acting ? 'Processing...' : 'Approve'}
+                  <button className="adm-btn-approve" disabled={!!acting} onClick={() => act(selected._id, 'approve')}>
+                    {acting === selected._id + 'approve' ? 'Processing...' : 'Approve'}
                   </button>
                 </div>
               )}

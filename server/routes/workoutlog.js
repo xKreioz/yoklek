@@ -30,8 +30,17 @@ router.get('/stats', authMiddleware, async (req, res) => {
     });
 
     // Unique workout days (for streak + activeDays count)
+    // Use toLocaleDateString with Thai locale to match client-side date strings (avoids UTC timezone shift)
+    const toLocalISO = (d) => {
+      const dt = new Date(d);
+      return [
+        dt.getFullYear(),
+        String(dt.getMonth() + 1).padStart(2, '0'),
+        String(dt.getDate()).padStart(2, '0'),
+      ].join('-');
+    };
     const dayStrings = [...new Set(
-      logs.map(l => new Date(l.date).toISOString().slice(0, 10))
+      logs.map(l => toLocalISO(l.date))
     )].sort().reverse(); // newest first
 
     const activeDays = dayStrings.length;

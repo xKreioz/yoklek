@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Edit2, EyeOff, Eye, Check, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { API } from '../lib/api';
 
 function Profile() {
   const navigate = useNavigate();
   const { user: authUser, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -27,7 +27,7 @@ function Profile() {
     const token = localStorage.getItem('token');
     if (!token) { navigate('/login'); return; }
 
-    fetch('http://localhost:5000/api/auth/me', {
+    fetch(`${API}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -53,7 +53,7 @@ function Profile() {
     setSaving(true); setError(''); setSuccess('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/auth/profile', {
+      const res = await fetch(`${API}/auth/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(form),
@@ -77,7 +77,7 @@ function Profile() {
     setPwError(''); setPwSuccess('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/auth/profile/password', {
+      const res = await fetch(`${API}/auth/profile/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(pwForm),
@@ -177,7 +177,7 @@ function Profile() {
           <label>Password</label>
           <div className="input-with-icon">
             <input
-              type={showPassword ? 'text' : 'password'}
+              type="password"
               value="••••••••••••"
               readOnly
               style={{ cursor: 'default' }}
@@ -187,7 +187,7 @@ function Profile() {
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}
               onClick={() => setShowPwSection(!showPwSection)}
             >
-              {showPassword ? <Eye size={18} className="input-icon" /> : <EyeOff size={18} className="input-icon" />}
+              {showPwSection ? <Eye size={18} className="input-icon" /> : <EyeOff size={18} className="input-icon" />}
             </button>
           </div>
         </div>

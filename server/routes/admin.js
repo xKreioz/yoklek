@@ -86,7 +86,11 @@ router.get('/users/:id/stats', authMiddleware, requireAdmin, async (req, res) =>
     const logs = await WorkoutLog.find({ userId: req.params.id, date: { $gte: since } })
       .sort({ date: -1 }).lean();
 
-    const activeDates = [...new Set(logs.map(l => l.date.toISOString().slice(0, 10)))];
+    const toLocalISO = (d) => {
+      const dt = new Date(d);
+      return [dt.getFullYear(), String(dt.getMonth() + 1).padStart(2, '0'), String(dt.getDate()).padStart(2, '0')].join('-');
+    };
+    const activeDates = [...new Set(logs.map(l => toLocalISO(l.date)))];
 
     // Recent 20 workout logs with exercises
     const recent = await WorkoutLog.find({ userId: req.params.id })
@@ -101,6 +105,12 @@ router.put('/users/:id/profile', authMiddleware, requireAdmin, async (req, res) 
     const allowed = ['firstName','lastName','username','email','birthDate','gender','weight','height'];
     const update = {};
     allowed.forEach(k => { if (req.body[k] !== undefined) update[k] = req.body[k]; });
+
+    if (update.email) {
+      const existing = await User.findOne({ email: update.email, _id: { $ne: req.params.id } });
+      if (existing) return res.status(409).json({ message: 'Email already in use' });
+    }
+
     const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password');
     res.json(user);
   } catch (err) { res.status(500).json({ message: 'Server error' }); }

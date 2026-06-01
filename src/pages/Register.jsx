@@ -73,7 +73,7 @@ function Register() {
         )}
 
         <Button variant="secondary" disabled={loading}>
-          {loading ? 'Signing up...' : 'Sign in'}
+          {loading ? 'Signing up...' : 'Sign up'}
         </Button>
       </form>
 

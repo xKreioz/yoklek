@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
+import { API } from '../lib/api';
 
 function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -19,7 +20,7 @@ function ResetPassword() {
     if (password.length < 6) return setError('Password must be at least 6 characters');
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/reset-password', {
+      const res = await fetch(`${API}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),

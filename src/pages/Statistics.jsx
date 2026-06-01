@@ -140,7 +140,7 @@ function BestPerformance({ bestStats, onGoalSaved }) {
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%', marginTop: '0.25rem', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem' }}
           >
             {showAll
-              ? <><ChevronUp size={18} /> </>
+              ? <><ChevronUp size={18} /> Show less</>
               : <><ChevronDown size={18} /> +{bestStats.length - 3} more</>
             }
           </button>
