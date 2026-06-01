@@ -207,7 +207,7 @@ function ReviewTab({ userRole }) {
 
       {loading ? <p style={{ color: 'var(--text-muted)', textAlign: 'center' }}>Loading...</p> : null}
       {!loading && pending.length === 0 && (
-        <p style={{ color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.9rem' }}>No pending submissions 🎉</p>
+        <p style={{ color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.9rem' }}>No pending submissions</p>
       )}
 
       <div className="history-list">
