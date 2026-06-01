@@ -53,6 +53,15 @@ export default function Notification() {
     fetchUnreadCount();
   };
 
+  const markOneRead = async (id) => {
+    setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
+    await fetch(`${API}/notifications/${id}/read`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${tk()}` },
+    }).catch(() => {});
+    fetchUnreadCount();
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-main)' }}>
       {/* Header */}
@@ -86,13 +95,16 @@ export default function Notification() {
         {notifications.map(n => {
           const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.daily_motivation;
           return (
-            <div key={n._id} style={{
-              background: n.read ? '#111' : cfg.bg,
-              border: `1px solid ${n.read ? '#1e1e1e' : cfg.color + '44'}`,
-              borderRadius: 12, padding: '0.9rem 1rem',
-              display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
-              transition: 'background 0.2s',
-            }}>
+            <div key={n._id}
+              onClick={() => !n.read && markOneRead(n._id)}
+              style={{
+                background: n.read ? '#111' : cfg.bg,
+                border: `1px solid ${n.read ? '#1e1e1e' : cfg.color + '44'}`,
+                borderRadius: 12, padding: '0.9rem 1rem',
+                display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
+                transition: 'background 0.2s',
+                cursor: n.read ? 'default' : 'pointer',
+              }}>
               {/* Icon */}
               <div style={{
                 width: 36, height: 36, borderRadius: '50%', flexShrink: 0,

@@ -90,7 +90,8 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'Expert access required' });
     }
 
-    const submission = await VerificationSubmission.findById(req.params.id);
+    const submission = await VerificationSubmission.findById(req.params.id)
+      .populate('exerciseId', 'name');
     if (!submission) return res.status(404).json({ message: 'Submission not found' });
     if (submission.status !== 'pending') {
       return res.status(400).json({ message: 'Submission already reviewed' });
@@ -109,10 +110,10 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
     const targetUser = await User.findById(submission.userId);
     if (targetUser) {
       const alreadyHasBadge = targetUser.badges.some(
-        (b) => b.exerciseId.toString() === submission.exerciseId.toString()
+        (b) => b.exerciseId.toString() === submission.exerciseId._id.toString()
       );
       if (!alreadyHasBadge) {
-        targetUser.badges.push({ exerciseId: submission.exerciseId });
+        targetUser.badges.push({ exerciseId: submission.exerciseId._id });
         await targetUser.save();
       }
     }
@@ -137,7 +138,8 @@ router.put('/:id/reject', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'Expert access required' });
     }
 
-    const submission = await VerificationSubmission.findById(req.params.id);
+    const submission = await VerificationSubmission.findById(req.params.id)
+      .populate('exerciseId', 'name');
     if (!submission) return res.status(404).json({ message: 'Submission not found' });
     if (submission.status !== 'pending') {
       return res.status(400).json({ message: 'Submission already reviewed' });
