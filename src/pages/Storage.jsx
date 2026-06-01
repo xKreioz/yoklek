@@ -32,14 +32,13 @@ function Storage() {
     const params = new URLSearchParams();
     if (searchQuery) params.set('search', searchQuery);
     if (activeCategory !== 'All') params.set('muscleGroup', activeCategory);
-    if (verifiedOnly) params.set('verified', 'true');
 
     setLoading(true);
     fetch(`${API}/exercises?${params}`)
       .then((r) => r.json())
       .then((data) => { setExercises(data); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [searchQuery, activeCategory, verifiedOnly]);
+  }, [searchQuery, activeCategory]);
 
   return (
     <div className="storage-page" style={{ paddingBottom: '2rem' }}>
@@ -78,11 +77,13 @@ function Storage() {
       {/* List */}
       {loading ? (
         <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>Loading...</p>
-      ) : exercises.length === 0 ? (
-        <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>No exercises found</p>
+      ) : exercises.filter(ex => !verifiedOnly || myBadges.has(ex._id)).length === 0 ? (
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>
+          {verifiedOnly ? 'ยังไม่มีท่าที่คุณ verify แล้ว' : 'No exercises found'}
+        </p>
       ) : (
         <div className="exercise-list">
-          {exercises.map((ex) => (
+          {exercises.filter(ex => !verifiedOnly || myBadges.has(ex._id)).map((ex) => (
             <div key={ex._id} className="exercise-card" onClick={() => setSelected(ex)}>
               <img src={ex.imageUrl} alt={ex.name} className="exercise-image" />
               <div className="exercise-info">

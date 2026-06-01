@@ -4,6 +4,8 @@ const authMiddleware = require('../middleware/auth');
 const WorkoutLog = require('../models/WorkoutLog');
 const Exercise   = require('../models/Exercise');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
+const { notify } = require('../utils/notify');
 
 // GET stats summary for current user
 router.get('/stats', authMiddleware, async (req, res) => {
@@ -172,6 +174,27 @@ router.post('/', authMiddleware, async (req, res) => {
         })),
       })),
     });
+
+    // Check streak milestones (7, 30, 100 unique workout days)
+    const allLogs = await WorkoutLog.find({ userId: req.user.userId }).lean();
+    const uniqueDays = new Set(allLogs.map(l => {
+      const d = new Date(l.date);
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    })).size;
+
+    const MILESTONES = {
+      7:   { type: 'streak_7',   title: '🔥 7 วันแห่งความมุ่งมั่น!',    message: 'คุณออกกำลังกายครบ 7 วันแล้ว! Streak กำลังลุกไหม้ อย่าหยุด!' },
+      30:  { type: 'streak_30',  title: '💪 30 วัน — นิสัยใหม่เกิดแล้ว!', message: 'ออกกำลังกายครบ 30 วัน! คุณกำลังสร้างนิสัยที่ดีที่สุดในชีวิต 🏆' },
+      100: { type: 'streak_100', title: '🏆 100 วัน Legend!',             message: 'เหลือเชื่อ! 100 วันของการออกกำลังกาย คุณคือแรงบันดาลใจของทุกคน 🌟' },
+    };
+
+    if (MILESTONES[uniqueDays]) {
+      const { type, title, message } = MILESTONES[uniqueDays];
+      const alreadySent = await Notification.findOne({ userId: req.user.userId, type });
+      if (!alreadySent) {
+        notify(req.user.userId, type, title, message);
+      }
+    }
 
     res.status(201).json(log);
   } catch (err) {

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const { sendResetEmail } = require('../utils/mailer');
+const { notify } = require('../utils/notify');
 
 const router = express.Router();
 
@@ -26,6 +27,11 @@ router.post('/register', async (req, res) => {
     }
 
     const user = await User.create({ email, password, firstName, lastName, birthDate, gender, weight, height });
+
+    notify(user._id, 'welcome',
+      `🎉 ยินดีต้อนรับสู่ YOKLEK, ${firstName}!`,
+      'บัญชีของคุณพร้อมใช้งานแล้ว เริ่ม record การออกกำลังกายและ verify ท่าของคุณได้เลย 💪'
+    );
 
     const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
 

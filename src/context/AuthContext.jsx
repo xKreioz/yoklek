@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Fetch fresh user data (including role/badges) from server
   const refreshUser = async () => {
@@ -24,12 +25,27 @@ export function AuthProvider({ children }) {
     } catch {}
   };
 
+  const fetchUnreadCount = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${API}/notifications/unread-count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const { count } = await res.json();
+        setUnreadCount(count);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
-      refreshUser(); // sync latest role/badges from server
+      refreshUser();
+      fetchUnreadCount();
     }
     setLoading(false);
   }, []);
@@ -66,10 +82,11 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    setUnreadCount(0);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, unreadCount, fetchUnreadCount }}>
       {children}
     </AuthContext.Provider>
   );

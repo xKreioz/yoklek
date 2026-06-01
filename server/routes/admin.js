@@ -6,6 +6,7 @@ const Exercise = require('../models/Exercise');
 const ExpertApplication = require('../models/ExpertApplication');
 const VerificationSubmission = require('../models/VerificationSubmission');
 const WorkoutLog = require('../models/WorkoutLog');
+const { notify } = require('../utils/notify');
 
 async function requireAdmin(req, res, next) {
   const user = await User.findById(req.user.userId).select('role');
@@ -141,8 +142,12 @@ router.put('/expert-applications/:id/approve', authMiddleware, requireAdmin, asy
     if (!app) return res.status(404).json({ message: 'Not found' });
     app.status = 'approved'; app.reviewedBy = req.user.userId; await app.save();
     await User.findByIdAndUpdate(app.userId, { role: 'expert' });
+    notify(app.userId, 'expert_approved',
+      '🏅 คุณได้รับสถานะ Expert แล้ว!',
+      'ยินดีด้วย! Admin อนุมัติคำขอเป็น Trainer ของคุณแล้ว ตอนนี้คุณสามารถ review การ verify ของสมาชิกได้เลย'
+    );
     res.json({ message: 'Expert approved' });
-  } catch (err) { res.status(500).json({ message: 'Server error' }); }
+  } catch (err) { res.status(500).json({ message: 'Server error', error: err.message }); }
 });
 
 router.put('/expert-applications/:id/reject', authMiddleware, requireAdmin, async (req, res) => {
@@ -150,8 +155,12 @@ router.put('/expert-applications/:id/reject', authMiddleware, requireAdmin, asyn
     const app = await ExpertApplication.findById(req.params.id);
     if (!app) return res.status(404).json({ message: 'Not found' });
     app.status = 'rejected'; app.reviewedBy = req.user.userId; await app.save();
+    notify(app.userId, 'expert_rejected',
+      '❌ คำขอ Trainer ไม่ผ่านการอนุมัติ',
+      'Admin ได้ตรวจสอบคำขอของคุณแล้ว แต่ยังไม่ผ่านในครั้งนี้ สามารถสมัครใหม่ได้ในภายหลัง'
+    );
     res.json({ message: 'Application rejected' });
-  } catch (err) { res.status(500).json({ message: 'Server error' }); }
+  } catch (err) { res.status(500).json({ message: 'Server error', error: err.message }); }
 });
 
 // ── Exercises ─────────────────────────────────────────────────────────────────

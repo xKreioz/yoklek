@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Exercise = require('../models/Exercise');
 const VerificationSubmission = require('../models/VerificationSubmission');
 const ExpertApplication = require('../models/ExpertApplication');
+const { notify } = require('../utils/notify');
 
 // Middleware: require expert or admin
 function requireExpert(req, res, next) {
@@ -116,6 +117,12 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
       }
     }
 
+    const exName = submission.exerciseId?.name || 'ท่าออกกำลังกาย';
+    notify(submission.userId, 'verify_approved',
+      `✅ Verified: ${exName}`,
+      `ยินดีด้วย! ท่า "${exName}" ของคุณผ่านการตรวจสอบแล้ว คุณได้รับ badge เรียบร้อย 🏅`
+    );
+
     res.json({ message: 'Approved successfully', submission });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -142,6 +149,12 @@ router.put('/:id/reject', authMiddleware, async (req, res) => {
     submission.feedback = feedback || '';
     submission.reviewedAt = new Date();
     await submission.save();
+
+    const exName = submission.exerciseId?.name || 'ท่าออกกำลังกาย';
+    notify(submission.userId, 'verify_rejected',
+      `❌ ไม่ผ่าน: ${exName}`,
+      `ท่า "${exName}" ยังไม่ผ่านการตรวจสอบ${feedback ? ` — Feedback: ${feedback}` : ''} ลองใหม่ได้เลยนะ!`
+    );
 
     res.json({ message: 'Rejected', submission });
   } catch (err) {
