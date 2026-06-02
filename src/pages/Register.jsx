@@ -54,7 +54,7 @@ function Register() {
           <Input type="text" placeholder="Last Name" value={form.lastName} onChange={set('lastName')} />
         </div>
 
-        <Input type="date" placeholder="Birth" value={form.birthDate} onChange={set('birthDate')} />
+        <Input type="date" placeholder="Birth" value={form.birthDate} onChange={set('birthDate')} max={new Date().toISOString().slice(0, 10)} />
 
         <Select
           defaultLabel="Gender"
@@ -64,8 +64,8 @@ function Register() {
         />
 
         <div className="row-group">
-          <Input type="number" placeholder="Weight (kg)" value={form.weight} onChange={set('weight')} />
-          <Input type="number" placeholder="Height (cm)" value={form.height} onChange={set('height')} />
+          <Input type="number" placeholder="Weight (kg)" value={form.weight} onChange={set('weight')} min="0" />
+          <Input type="number" placeholder="Height (cm)" value={form.height} onChange={set('height')} min="0" />
         </div>
 
         {error && (

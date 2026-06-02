@@ -17,6 +17,7 @@ function Profile() {
     firstName: '', lastName: '', username: '',
     email: '', birthDate: '', gender: '', weight: '', height: '',
   });
+  const [savedForm, setSavedForm] = useState(null);
 
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '' });
   const [pwError, setPwError] = useState('');
@@ -31,7 +32,7 @@ function Profile() {
     })
       .then((r) => r.json())
       .then((data) => {
-        setForm({
+        const loaded = {
           firstName: data.firstName || '',
           lastName: data.lastName || '',
           username: data.username || '',
@@ -40,7 +41,9 @@ function Profile() {
           gender: data.gender || '',
           weight: data.weight ?? '',
           height: data.height ?? '',
-        });
+        };
+        setForm(loaded);
+        setSavedForm(loaded);
         setLoading(false);
       })
       .catch(() => { setLoading(false); setError('Failed to load profile'); });
@@ -59,6 +62,7 @@ function Profile() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
+      setSavedForm(form);
       setSuccess('Profile saved');
       setIsEditing(false);
       setTimeout(() => setSuccess(''), 3000);
@@ -70,6 +74,7 @@ function Profile() {
   };
 
   const handleCancel = () => {
+    if (savedForm) setForm(savedForm);
     setIsEditing(false);
     setError('');
     setPwForm({ currentPassword: '', newPassword: '' });
@@ -173,17 +178,6 @@ function Profile() {
         <div className="form-field">
           <label>Email</label>
           <input type="email" value={form.email} readOnly={!isEditing} className={isEditing ? 'editable' : ''} onChange={set('email')} />
-        </div>
-
-        {/* Password row */}
-        <div className="form-field">
-          <label>Password</label>
-          <input
-            type="password"
-            value="••••••••••••"
-            readOnly
-            style={{ cursor: 'default' }}
-          />
         </div>
 
         {/* Change password sub-form — เปิดเมื่อกดแก้ไข */}

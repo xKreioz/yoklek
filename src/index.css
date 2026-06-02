@@ -1714,15 +1714,25 @@ select:focus {
   gap: 0.5rem;
 }
 
+.history-sets-box {
+  background-color: #383838;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
 .history-detail-row {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
-  background-color: #383838;
   padding: 0.8rem 1.5rem;
-  border-radius: 8px;
   font-size: 1rem;
   font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.history-detail-row:last-child {
+  border-bottom: none;
 }
 
 .history-detail-row span:nth-child(1) {
@@ -1768,7 +1778,8 @@ select:focus {
 
 /* Desktop visual boundary for mobile-first layout */
 @media (min-width: 481px) {
-  .app-layout {
+  .app-layout,
+  .profile-page {
     box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
   }
 }

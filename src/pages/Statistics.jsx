@@ -413,13 +413,15 @@ function Statistics() {
                             <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff' }}>{ex.exerciseName}</span>
                           </div>
                           {/* Sets */}
-                          {ex.sets.map((s, si) => (
-                            <div key={si} className="history-detail-row">
-                              <span>Set {si + 1}</span>
-                              <span>{s.weight} kg</span>
-                              <span>× {s.reps}</span>
-                            </div>
-                          ))}
+                          <div className="history-sets-box">
+                            {ex.sets.map((s, si) => (
+                              <div key={si} className="history-detail-row">
+                                <span>Set {si + 1}</span>
+                                <span>{s.weight} kg</span>
+                                <span>× {s.reps}</span>
+                              </div>
+                            ))}
+                          </div>
                           {/* Summary */}
                           {(() => {
                             const totalVolume = ex.sets.reduce((sum, s) => sum + (s.reps || 0) * (s.weight || 0), 0);
