@@ -277,44 +277,63 @@ function ReviewTab({ userRole }) {
   );
 }
 
+// ─── ImgBB upload helper ──────────────────────────────────────────────────────
+const IMGBB_KEY = import.meta.env.VITE_IMGBB_KEY;
+
+async function uploadToImgBB(file) {
+  const body = new FormData();
+  body.append('image', file);
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, {
+    method: 'POST', body,
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error('Upload failed');
+  return data.data.url;
+}
+
 // ─── Expert Lock / Apply Screen ───────────────────────────────────────────────
 function ExpertLockScreen() {
-  const [applying, setApplying] = useState(false);
-  const [myApp, setMyApp] = useState(null);
-  const [form, setForm] = useState({ experience: '', certifications: '', credentialUrl: '' });
+  const [showForm, setShowForm] = useState(false);
+  const [myApp, setMyApp] = useState(undefined); // undefined = loading
+  const [form, setForm] = useState({ experience: '', certifications: '', videoUrl: '', certImageUrls: [], links: [] });
+  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+
+  const handleImagePick = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    if (!IMGBB_KEY) { setError('VITE_IMGBB_KEY ยังไม่ได้ตั้งค่าใน .env'); return; }
+    if (form.certImageUrls.length + files.length > 5) {
+      setError('อัปโหลดได้สูงสุด 5 รูป'); return;
+    }
+    setUploading(true);
+    setError('');
+    try {
+      const urls = await Promise.all(files.map(uploadToImgBB));
+      setForm(f => ({ ...f, certImageUrls: [...f.certImageUrls, ...urls] }));
+    } catch {
+      setError('Upload รูปไม่สำเร็จ ลองใหม่อีกครั้ง');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeImage = (idx) => {
+    setForm(f => ({ ...f, certImageUrls: f.certImageUrls.filter((_, i) => i !== idx) }));
+  };
 
   useEffect(() => {
     fetch(`${API}/verify/my-expert-application`, { headers: { Authorization: `Bearer ${token()}` } })
-      .then(r => r.json()).then(data => { if (data) setMyApp(data); }).catch(() => {});
+      .then(r => r.json())
+      .then(data => setMyApp(data || null))
+      .catch(() => setMyApp(null));
   }, []);
-
-  if (myApp?.status === 'pending') {
-    return (
-      <div className="review-view-container">
-        <Clock size={80} color="#ed8936" strokeWidth={1} />
-        <h2 className="review-title" style={{ marginTop: '1rem' }}>Application Pending</h2>
-        <p className="review-subtitle">Your expert application is being reviewed.<br />We'll notify you once approved.</p>
-      </div>
-    );
-  }
-
-  if (!applying) {
-    return (
-      <div className="review-view-container">
-        <Lock size={120} color="var(--text-muted)" strokeWidth={1} />
-        <h2 className="review-title">Expert Only</h2>
-        <p className="review-subtitle">Register as an expert to review exercise<br />submissions for the community.</p>
-        <button className="btn review-btn" onClick={() => setApplying(true)}>Register Expert</button>
-      </div>
-    );
-  }
 
   const handleApply = async (e) => {
     e.preventDefault();
-    setError(''); setSuccess('');
+    setError('');
     if (!form.experience) { setError('Please describe your experience'); return; }
     setSubmitting(true);
     try {
@@ -326,10 +345,77 @@ function ExpertLockScreen() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setMyApp(data);
-      setSuccess('Application submitted!');
+      setShowForm(false);
     } catch (err) { setError(err.message); }
     finally { setSubmitting(false); }
   };
+
+  // Loading
+  if (myApp === undefined) {
+    return <div className="review-view-container"><p style={{ color: 'var(--text-muted)' }}>Loading...</p></div>;
+  }
+
+  // Pending
+  if (myApp?.status === 'pending') {
+    return (
+      <div className="review-view-container">
+        <Clock size={72} color="#ed8936" strokeWidth={1} />
+        <h2 className="review-title" style={{ marginTop: '1rem' }}>Application Pending</h2>
+        <p className="review-subtitle">
+          Your expert application is being reviewed.<br />We'll notify you within 3–5 days.
+        </p>
+        {myApp.experience && (
+          <div style={{ marginTop: '1rem', background: '#252525', borderRadius: 10, padding: '12px 16px', width: '100%', maxWidth: 320, textAlign: 'left' }}>
+            <p style={{ fontSize: '0.7rem', color: '#555', margin: '0 0 4px' }}>ข้อมูลที่ส่ง</p>
+            <p style={{ fontSize: '0.82rem', color: '#ccc', margin: 0, lineHeight: 1.5 }}>{myApp.experience}</p>
+            {myApp.certifications && (
+              <p style={{ fontSize: '0.78rem', color: '#888', margin: '6px 0 0' }}>🎓 {myApp.certifications}</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Rejected
+  if (myApp?.status === 'rejected') {
+    return (
+      <div className="review-view-container">
+        <AlertCircle size={72} color="#e53e3e" strokeWidth={1} />
+        <h2 className="review-title" style={{ marginTop: '1rem', color: '#e53e3e' }}>ไม่ผ่านการอนุมัติ</h2>
+        <p className="review-subtitle">Admin ได้ตรวจสอบคำขอของคุณแล้ว แต่ยังไม่ผ่านในครั้งนี้</p>
+        {myApp.reviewNote && (
+          <div style={{ marginTop: '0.75rem', background: '#2a1515', border: '1px solid #5a1e1e', borderRadius: 10, padding: '12px 16px', width: '100%', maxWidth: 320, textAlign: 'left' }}>
+            <p style={{ fontSize: '0.7rem', color: '#e53e3e', margin: '0 0 4px' }}>หมายเหตุจาก Admin</p>
+            <p style={{ fontSize: '0.85rem', color: '#fca5a5', margin: 0, lineHeight: 1.5 }}>{myApp.reviewNote}</p>
+          </div>
+        )}
+        <button
+          className="btn review-btn"
+          style={{ marginTop: '1.5rem' }}
+          onClick={() => {
+            setMyApp(null);
+            setForm({ experience: '', certifications: '', videoUrl: '', certImageUrls: [], links: [] });
+            setShowForm(true);
+          }}
+        >
+          สมัครใหม่
+        </button>
+      </div>
+    );
+  }
+
+  // Not applied — show lock screen or form
+  if (!showForm) {
+    return (
+      <div className="review-view-container">
+        <Lock size={120} color="var(--text-muted)" strokeWidth={1} />
+        <h2 className="review-title">Expert Only</h2>
+        <p className="review-subtitle">Register as an expert to review exercise<br />submissions for the community.</p>
+        <button className="btn review-btn" onClick={() => setShowForm(true)}>Register Expert</button>
+      </div>
+    );
+  }
 
   return (
     <div className="form-card" style={{ marginTop: 0 }}>
@@ -358,18 +444,102 @@ function ExpertLockScreen() {
         <input
           type="url"
           className="verify-input"
-          placeholder="Credential URL / LinkedIn / Certificate link (optional)"
-          value={form.credentialUrl}
-          onChange={e => setForm(f => ({ ...f, credentialUrl: e.target.value }))}
+          placeholder="Video URL (YouTube — แสดงตัวเองออกกำลังกาย, optional)"
+          value={form.videoUrl}
+          onChange={e => setForm(f => ({ ...f, videoUrl: e.target.value }))}
         />
 
-        {error && <p style={{ color: '#e53e3e', fontSize: '0.8rem' }}>{error}</p>}
-        {success && <p style={{ color: '#48bb78', fontSize: '0.8rem' }}>{success}</p>}
+        {/* Certificate image upload */}
+        <div>
+          <label style={{ fontSize: '0.78rem', color: '#aaa', marginBottom: 6, display: 'block' }}>
+            รูปใบ Certificate — อัปโหลดได้สูงสุด 5 รูป {form.certImageUrls.length > 0 && `(${form.certImageUrls.length}/5)`}
+          </label>
 
-        <button className="btn btn-primary" style={{ padding: '1rem', fontSize: '1rem' }} disabled={submitting}>
-          {submitting ? 'Submitting...' : 'Submit Application'}
+          {/* Preview grid */}
+          {form.certImageUrls.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 8 }}>
+              {form.certImageUrls.map((url, idx) => (
+                <div key={idx} style={{ position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden' }}>
+                  <img src={url} alt={`cert ${idx + 1}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: '50%', width: 22, height: 22, color: '#fff', cursor: 'pointer', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Upload button — hide when at max */}
+          {form.certImageUrls.length < 5 && (
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: '#383838', borderRadius: 8, padding: '10px 14px',
+              cursor: uploading ? 'not-allowed' : 'pointer', border: '1px dashed #555',
+            }}>
+              <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleImagePick} disabled={uploading} />
+              <span style={{ fontSize: '1.1rem' }}>📎</span>
+              <span style={{ fontSize: '0.82rem', color: uploading ? '#888' : '#ccc' }}>
+                {uploading ? 'กำลัง upload...' : 'เลือกรูปจากเครื่อง'}
+              </span>
+            </label>
+          )}
+        </div>
+
+        {/* Dynamic links */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{ fontSize: '0.78rem', color: '#aaa' }}>
+            ลิงก์ LinkedIn / Portfolio / อื่นๆ {form.links.length > 0 && `(${form.links.length}/5)`}
+          </label>
+
+          {form.links.map((link, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: 6 }}>
+              <select
+                value={link.label}
+                onChange={e => setForm(f => ({ ...f, links: f.links.map((l, i) => i === idx ? { ...l, label: e.target.value } : l) }))}
+                style={{ width: 120, flexShrink: 0, background: '#383838', border: '1px solid #555', borderRadius: 8, color: '#fff', padding: '8px', fontSize: '0.78rem' }}
+              >
+                <option value="LinkedIn">LinkedIn</option>
+                <option value="Instagram">Instagram</option>
+                <option value="Facebook">Facebook</option>
+                <option value="Website">Website</option>
+                <option value="Other">Other</option>
+              </select>
+              <input
+                type="url"
+                className="verify-input"
+                placeholder="https://..."
+                value={link.url}
+                onChange={e => setForm(f => ({ ...f, links: f.links.map((l, i) => i === idx ? { ...l, url: e.target.value } : l) }))}
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, links: f.links.filter((_, i) => i !== idx) }))}
+                style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontSize: '1rem', flexShrink: 0 }}
+              >✕</button>
+            </div>
+          ))}
+
+          {form.links.length < 5 && (
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, links: [...f.links, { label: 'LinkedIn', url: '' }] }))}
+              style={{ background: 'none', border: '1px dashed #555', borderRadius: 8, color: '#aaa', cursor: 'pointer', padding: '8px', fontSize: '0.8rem' }}
+            >
+              + เพิ่มลิงก์
+            </button>
+          )}
+        </div>
+
+        {error && <p style={{ color: '#e53e3e', fontSize: '0.8rem' }}>{error}</p>}
+
+        <button className="btn btn-primary" style={{ padding: '1rem', fontSize: '1rem' }} disabled={submitting || uploading}>
+          {submitting ? 'Submitting...' : uploading ? 'กำลัง upload รูป...' : 'Submit Application'}
         </button>
-        <button type="button" onClick={() => setApplying(false)}
+        <button type="button" onClick={() => setShowForm(false)}
           style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem' }}>
           Cancel
         </button>

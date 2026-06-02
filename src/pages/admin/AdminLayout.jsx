@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCheck, FileText, ShieldAlert, Bell, LogOut, User, Home } from 'lucide-react';
+import { LayoutDashboard, Users, UserCheck, FileText, ShieldAlert, LogOut, User, Home } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import './admin.css';
 
@@ -105,9 +105,6 @@ export default function AdminLayout() {
         <header className="adm-topbar">
           <div />
           <div className="adm-topbar-right">
-            <button className="adm-icon-btn" title="Notifications">
-              <Bell size={20} />
-            </button>
             <AvatarMenu user={user} onLogout={handleLogout} onGoApp={handleGoApp} />
           </div>
         </header>

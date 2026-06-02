@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
         { description: { $regex: search, $options: 'i' } },
       ];
     }
-    if (muscleGroup && muscleGroup !== 'All') query.muscleGroup = muscleGroup;
+    if (muscleGroup && muscleGroup !== 'All') query.muscleGroup = { $in: [muscleGroup] };
     if (verified === 'true') query.verified = true;
     if (difficulty) query.difficulty = difficulty;
 

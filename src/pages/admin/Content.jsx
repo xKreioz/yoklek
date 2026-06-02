@@ -81,9 +81,11 @@ function ViewPanel({ ex, onBack, onEdit }) {
           <div style={{ background:'#141414',borderRadius:10,padding:'1rem' }}>
             <p style={{ fontSize:'0.75rem',color:'#888',margin:'0 0 8px' }}>Category</p>
             <div style={{ display:'flex',flexWrap:'wrap',gap:6,alignItems:'center' }}>
-              <span style={{ padding:'4px 12px',background:'#c0392b',borderRadius:20,fontSize:'0.75rem',fontWeight:600,color:'#fff' }}>
-                {ex.muscleGroup}
-              </span>
+              {(Array.isArray(ex.muscleGroup) ? ex.muscleGroup : [ex.muscleGroup]).filter(Boolean).map(g => (
+                <span key={g} style={{ padding:'4px 12px',background:'#c0392b',borderRadius:20,fontSize:'0.75rem',fontWeight:600,color:'#fff' }}>
+                  {g}
+                </span>
+              ))}
               <span style={{ padding:'4px 12px',background:'#252525',borderRadius:20,fontSize:'0.75rem',color:'#888' }}>
                 {ex.difficulty}
               </span>
@@ -122,7 +124,11 @@ function ExerciseForm({ initial, onBack, onSaved }) {
   });
   const [saving, setSaving]   = useState(false);
   const [error,  setError]    = useState('');
-  const [catChips,    setCatChips]    = useState(initial?.muscleGroup ? [initial.muscleGroup] : []);
+  const [catChips,    setCatChips]    = useState(
+    Array.isArray(initial?.muscleGroup) ? initial.muscleGroup
+    : initial?.muscleGroup ? [initial.muscleGroup]
+    : []
+  );
   const [showCatPick, setShowCatPick] = useState(false);
   const catRef = useRef(null);
 
@@ -143,7 +149,7 @@ function ExerciseForm({ initial, onBack, onSaved }) {
     setSaving(true); setError('');
     const body = {
       ...form,
-      muscleGroup: catChips[0] || form.muscleGroup,
+      muscleGroup: catChips,
       steps:    form.steps.split('\n').map(s => s.trim()).filter(Boolean),
       warnings: form.warnings.split('\n').map(s => s.trim()).filter(Boolean),
     };
@@ -438,8 +444,12 @@ export default function Content() {
                     </div>
                   </div>
                 </td>
-                <td style={{ textAlign:'center',color:'#aaa',padding:'12px 8px' }} onClick={() => setView({mode:'view',ex})}>
-                  {ex.muscleGroup}
+                <td style={{ textAlign:'center',padding:'12px 8px' }} onClick={() => setView({mode:'view',ex})}>
+                  <div style={{ display:'flex',flexWrap:'wrap',gap:4,justifyContent:'center' }}>
+                    {(Array.isArray(ex.muscleGroup) ? ex.muscleGroup : [ex.muscleGroup]).filter(Boolean).map(g => (
+                      <span key={g} style={{ padding:'2px 8px',background:'#2a1515',border:'1px solid #5a1e1e',borderRadius:20,fontSize:'0.68rem',color:'#f87171' }}>{g}</span>
+                    ))}
+                  </div>
                 </td>
                 <td style={{ textAlign:'center',color:'#aaa',padding:'12px 8px' }} onClick={() => setView({mode:'view',ex})}>
                   {ex.verifiedUsers}

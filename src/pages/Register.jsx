@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { ChevronLeft } from 'lucide-react';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { Select } from '../components/Select';
@@ -43,6 +44,27 @@ function Register() {
 
   return (
     <div className="screen-container">
+      <button
+        onClick={() => navigate('/landing')}
+        style={{
+          position: 'absolute',
+          top: '1.5rem',
+          left: '1.5rem',
+          width: 40,
+          height: 40,
+          background: 'rgba(255,255,255,0.08)',
+          border: 'none',
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          cursor: 'pointer',
+        }}
+      >
+        <ChevronLeft size={24} />
+      </button>
+
       <h2 className="title" style={{ marginTop: '2rem', marginBottom: '2rem' }}>Register</h2>
 
       <form className="form-group" style={{ marginBottom: '2rem' }} onSubmit={handleSubmit}>

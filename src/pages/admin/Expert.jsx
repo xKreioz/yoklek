@@ -18,6 +18,8 @@ export default function Expert() {
   const [selected, setSelected] = useState(null);
   const [evTab, setEvTab] = useState('video');
   const [acting, setActing] = useState('');
+  const [rejectingId, setRejectingId] = useState(null);
+  const [rejectNote, setRejectNote]   = useState('');
 
   const load = () => {
     fetch(`${API}/admin/expert-applications`, { headers: { Authorization: `Bearer ${token()}` } })
@@ -37,13 +39,16 @@ export default function Expert() {
     return matchTab && name.includes(search.toLowerCase());
   });
 
-  const act = async (id, action) => {
+  const act = async (id, action, note = '') => {
     setActing(id + action);
     await fetch(`${API}/admin/expert-applications/${id}/${action}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+      body: JSON.stringify(note ? { reviewNote: note } : {}),
     });
     setActing('');
+    setRejectingId(null);
+    setRejectNote('');
     setSelected(null);
     load();
   };
@@ -154,13 +159,57 @@ export default function Expert() {
 
               {/* Actions — only show for pending */}
               {selected.status === 'pending' && (
-                <div className="adm-actions">
-                  <button className="adm-btn-reject" disabled={!!acting} onClick={() => act(selected._id, 'reject')}>
-                    {acting === selected._id + 'reject' ? 'Processing...' : 'Reject'}
-                  </button>
-                  <button className="adm-btn-approve" disabled={!!acting} onClick={() => act(selected._id, 'approve')}>
-                    {acting === selected._id + 'approve' ? 'Processing...' : 'Approve'}
-                  </button>
+                <div className="adm-actions" style={{ flexDirection: 'column', gap: 8 }}>
+                  {rejectingId === selected._id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                      <textarea
+                        value={rejectNote}
+                        onChange={e => setRejectNote(e.target.value)}
+                        placeholder="หมายเหตุสำหรับผู้สมัคร (optional)"
+                        rows={3}
+                        style={{
+                          width: '100%', background: '#1e1e1e', border: '1px solid #444',
+                          borderRadius: 8, color: '#fff', padding: '8px 10px',
+                          fontSize: '0.82rem', resize: 'vertical', boxSizing: 'border-box',
+                        }}
+                      />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          className="adm-btn-reject"
+                          style={{ flex: 1 }}
+                          disabled={!!acting}
+                          onClick={() => act(selected._id, 'reject', rejectNote)}
+                        >
+                          {acting === selected._id + 'reject' ? 'Processing...' : 'Confirm Reject'}
+                        </button>
+                        <button
+                          onClick={() => { setRejectingId(null); setRejectNote(''); }}
+                          style={{ flex: 1, background: '#333', border: 'none', borderRadius: 8, color: '#aaa', cursor: 'pointer', fontSize: '0.85rem' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                      <button
+                        className="adm-btn-reject"
+                        style={{ flex: 1 }}
+                        disabled={!!acting}
+                        onClick={() => { setRejectingId(selected._id); setRejectNote(''); }}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        className="adm-btn-approve"
+                        style={{ flex: 1 }}
+                        disabled={!!acting}
+                        onClick={() => act(selected._id, 'approve')}
+                      >
+                        {acting === selected._id + 'approve' ? 'Processing...' : 'Approve'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -173,10 +222,15 @@ export default function Expert() {
               )}
 
               {selected.status === 'rejected' && (
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <span className="adm-badge rejected" style={{ padding: '6px 16px', fontSize: '0.8rem' }}>
                     <XCircle size={14} /> Rejected
                   </span>
+                  {selected.reviewNote && (
+                    <p style={{ fontSize: '0.78rem', color: '#aaa', margin: 0, textAlign: 'center' }}>
+                      หมายเหตุ: {selected.reviewNote}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -193,49 +247,64 @@ export default function Expert() {
 
                 <div className="adm-evidence-view">
                   {evTab === 'video' && (
-                    selected.credentialUrl && isYouTube(selected.credentialUrl) ? (
+                    selected.videoUrl && isYouTube(selected.videoUrl) ? (
                       <div style={{ position: 'relative', paddingBottom: '56.25%', width: '100%', height: 0 }}>
                         <iframe
                           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                          src={`https://www.youtube.com/embed/${getYouTubeId(selected.credentialUrl)}?rel=0`}
+                          src={`https://www.youtube.com/embed/${getYouTubeId(selected.videoUrl)}?rel=0`}
                           title="Evidence" frameBorder="0" allowFullScreen
                         />
+                      </div>
+                    ) : selected.videoUrl ? (
+                      <div className="adm-evidence-placeholder">
+                        <Play size={36} />
+                        <a href={selected.videoUrl} target="_blank" rel="noreferrer"
+                          style={{ color: '#c0392b', fontSize: '0.75rem' }}>Open video link</a>
                       </div>
                     ) : (
                       <div className="adm-evidence-placeholder">
                         <Play size={36} />
-                        <span>ดูวิดีโอ</span>
-                        {selected.credentialUrl && (
-                          <a href={selected.credentialUrl} target="_blank" rel="noreferrer"
-                            style={{ color: '#c0392b', fontSize: '0.75rem' }}>Open link</a>
-                        )}
+                        <span style={{ color: '#555' }}>ไม่มีวิดีโอ</span>
                       </div>
                     )
                   )}
 
                   {evTab === 'picture' && (
-                    selected.credentialUrl && !isYouTube(selected.credentialUrl) && selected.credentialUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? (
-                      <img src={selected.credentialUrl} alt="credential" style={{ width: '100%', objectFit: 'cover', borderRadius: 8 }} />
+                    selected.certImageUrls?.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+                        {selected.certImageUrls.map((url, i) => (
+                          <img key={i} src={url} alt={`certificate ${i + 1}`}
+                            style={{ width: '100%', objectFit: 'contain', borderRadius: 8, maxHeight: 260, background: '#111' }} />
+                        ))}
+                      </div>
                     ) : (
                       <div className="adm-evidence-placeholder">
                         <Image size={36} />
-                        <span>ไม่มีรูปภาพ</span>
+                        <span>ไม่มีรูปใบ Certificate</span>
                       </div>
                     )
                   )}
 
                   {evTab === 'link' && (
-                    <div className="adm-evidence-placeholder">
-                      <Link2 size={28} />
-                      {selected.credentialUrl ? (
-                        <a href={selected.credentialUrl} target="_blank" rel="noreferrer"
-                          style={{ color: '#c0392b', fontSize: '0.8rem', wordBreak: 'break-all', textAlign: 'center', padding: '0 1rem' }}>
-                          {selected.credentialUrl}
-                        </a>
-                      ) : (
-                        <span>ไม่มีลิงก์</span>
-                      )}
-                    </div>
+                    selected.links?.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', padding: '0 4px' }}>
+                        {selected.links.map((link, i) => (
+                          <a key={i} href={link.url} target="_blank" rel="noreferrer"
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#1e1e1e', borderRadius: 8, padding: '10px 14px', textDecoration: 'none' }}>
+                            <Link2 size={16} color="#c0392b" style={{ flexShrink: 0 }} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 2 }}>{link.label}</div>
+                              <div style={{ fontSize: '0.78rem', color: '#c0392b', wordBreak: 'break-all', lineHeight: 1.4 }}>{link.url}</div>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="adm-evidence-placeholder">
+                        <Link2 size={28} />
+                        <span style={{ color: '#555' }}>ไม่มีลิงก์</span>
+                      </div>
+                    )
                   )}
                 </div>
               </div>

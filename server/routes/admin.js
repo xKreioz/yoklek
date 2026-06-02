@@ -154,10 +154,14 @@ router.put('/expert-applications/:id/reject', authMiddleware, requireAdmin, asyn
   try {
     const app = await ExpertApplication.findById(req.params.id);
     if (!app) return res.status(404).json({ message: 'Not found' });
-    app.status = 'rejected'; app.reviewedBy = req.user.userId; await app.save();
+    const { reviewNote } = req.body;
+    app.status = 'rejected';
+    app.reviewedBy = req.user.userId;
+    if (reviewNote) app.reviewNote = reviewNote;
+    await app.save();
     await notify(app.userId, 'expert_rejected',
       '❌ คำขอ Trainer ไม่ผ่านการอนุมัติ',
-      'Admin ได้ตรวจสอบคำขอของคุณแล้ว แต่ยังไม่ผ่านในครั้งนี้ สามารถสมัครใหม่ได้ในภายหลัง'
+      `Admin ได้ตรวจสอบคำขอของคุณแล้ว แต่ยังไม่ผ่านในครั้งนี้${reviewNote ? ` — หมายเหตุ: ${reviewNote}` : ''} สามารถสมัครใหม่ได้ในภายหลัง`
     );
     res.json({ message: 'Application rejected' });
   } catch (err) { res.status(500).json({ message: 'Server error', error: err.message }); }
@@ -172,7 +176,7 @@ router.get('/exercises', authMiddleware, requireAdmin, async (req, res) => {
       { name:   { $regex: search, $options: 'i' } },
       { nameEn: { $regex: search, $options: 'i' } },
     ];
-    if (muscleGroup) query.muscleGroup = muscleGroup;
+    if (muscleGroup) query.muscleGroup = { $in: [muscleGroup] };
     if (status === 'published') query.verified = true;
     if (status === 'draft')     query.verified = false;
     const sortMap = {

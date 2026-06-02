@@ -168,7 +168,7 @@ router.put('/:id/reject', authMiddleware, async (req, res) => {
 // ─── USER: Apply to be expert ─────────────────────────────────────────────────
 router.post('/apply-expert', authMiddleware, async (req, res) => {
   try {
-    const { experience, certifications, credentialUrl } = req.body;
+    const { experience, certifications, videoUrl, links, certImageUrls } = req.body;
     if (!experience) return res.status(400).json({ message: 'Experience is required' });
 
     const existing = await ExpertApplication.findOne({
@@ -179,7 +179,7 @@ router.post('/apply-expert', authMiddleware, async (req, res) => {
     }
 
     const app = await ExpertApplication.create({
-      userId: req.user.userId, experience, certifications, credentialUrl,
+      userId: req.user.userId, experience, certifications, videoUrl, links: links || [], certImageUrls: certImageUrls || [],
     });
     res.status(201).json(app);
   } catch (err) {

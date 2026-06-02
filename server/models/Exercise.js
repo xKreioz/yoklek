@@ -3,11 +3,10 @@ const mongoose = require('mongoose');
 const exerciseSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   nameEn: { type: String, trim: true },
-  muscleGroup: {
+  muscleGroup: [{
     type: String,
-    required: true,
     enum: ['Arm', 'Chest', 'Leg', 'Back', 'Shoulder'],
-  },
+  }],
   difficulty: { type: String, enum: ['beginner', 'intermediate', 'advanced'], default: 'beginner' },
   description: { type: String },
   steps: [{ type: String }],

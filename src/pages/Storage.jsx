@@ -30,6 +30,7 @@ function Storage() {
 
   useEffect(() => {
     const params = new URLSearchParams();
+    params.set('verified', 'true');
     if (searchQuery) params.set('search', searchQuery);
     if (activeCategory !== 'All') params.set('muscleGroup', activeCategory);
 
@@ -90,7 +91,9 @@ function Storage() {
                 <h3 className="exercise-title">{ex.name}</h3>
                 <p className="exercise-subtitle">{ex.nameEn}</p>
                 <div className="exercise-tags">
-                  <span className="tag category-tag">{ex.muscleGroup}</span>
+                  {(Array.isArray(ex.muscleGroup) ? ex.muscleGroup : [ex.muscleGroup]).filter(Boolean).map(g => (
+                    <span key={g} className="tag category-tag">{g}</span>
+                  ))}
                   <span style={{ fontSize: '0.65rem', color: difficultyColor[ex.difficulty], fontWeight: 600 }}>
                     {ex.difficulty}
                   </span>
@@ -141,7 +144,9 @@ function ExerciseModal({ exercise, onClose, isVerified }) {
 
         {/* Tags */}
         <div className="modal-tags" style={{ marginBottom: '1rem' }}>
-          <span className="modal-category-tag">{exercise.muscleGroup}</span>
+          {(Array.isArray(exercise.muscleGroup) ? exercise.muscleGroup : [exercise.muscleGroup]).filter(Boolean).map(g => (
+            <span key={g} className="modal-category-tag">{g}</span>
+          ))}
           <span style={{ fontSize: '0.7rem', color: difficultyColor[exercise.difficulty], fontWeight: 700, textTransform: 'capitalize' }}>
             {exercise.difficulty}
           </span>
