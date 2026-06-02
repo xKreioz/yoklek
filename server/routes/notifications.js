@@ -23,18 +23,15 @@ router.get('/', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    // Check if daily motivation exists for today
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999);
-    const hasTodayMotivation = await Notification.findOne({
-      userId, type: 'daily_motivation',
-      createdAt: { $gte: todayStart, $lte: todayEnd },
-    });
-
-    if (!hasTodayMotivation) {
-      const pick = MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)];
-      await Notification.create({ userId, type: 'daily_motivation', title: pick.title, message: pick.message });
-    }
+    // Ensure exactly one daily_motivation per user per day (atomic upsert prevents race condition)
+    const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0);
+    const todayEnd   = new Date(); todayEnd.setUTCHours(23, 59, 59, 999);
+    const pick = MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)];
+    await Notification.findOneAndUpdate(
+      { userId, type: 'daily_motivation', createdAt: { $gte: todayStart, $lte: todayEnd } },
+      { $setOnInsert: { userId, type: 'daily_motivation', title: pick.title, message: pick.message } },
+      { upsert: true }
+    );
 
     const notifications = await Notification.find({ userId })
       .sort({ createdAt: -1 })

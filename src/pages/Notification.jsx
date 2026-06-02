@@ -45,21 +45,32 @@ export default function Notification() {
   }, []);
 
   const markAllRead = async () => {
-    await fetch(`${API}/notifications/read-all`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${tk()}` },
-    }).catch(() => {});
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    fetchUnreadCount();
+    const prev = notifications;
+    setNotifications(p => p.map(n => ({ ...n, read: true })));
+    try {
+      const res = await fetch(`${API}/notifications/read-all`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${tk()}` },
+      });
+      if (!res.ok) throw new Error();
+      fetchUnreadCount();
+    } catch {
+      setNotifications(prev);
+    }
   };
 
   const markOneRead = async (id) => {
     setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
-    await fetch(`${API}/notifications/${id}/read`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${tk()}` },
-    }).catch(() => {});
-    fetchUnreadCount();
+    try {
+      const res = await fetch(`${API}/notifications/${id}/read`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${tk()}` },
+      });
+      if (!res.ok) throw new Error();
+      fetchUnreadCount();
+    } catch {
+      setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: false } : n));
+    }
   };
 
   return (

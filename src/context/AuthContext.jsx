@@ -61,6 +61,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
+    fetchUnreadCount();
     return data.user;
   };
 
@@ -75,6 +76,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
+    fetchUnreadCount();
     return data.user;
   };
 

@@ -28,7 +28,7 @@ router.post('/register', async (req, res) => {
 
     const user = await User.create({ email, password, firstName, lastName, birthDate, gender, weight, height });
 
-    notify(user._id, 'welcome',
+    await notify(user._id, 'welcome',
       `🎉 ยินดีต้อนรับสู่ YOKLEK, ${firstName}!`,
       'บัญชีของคุณพร้อมใช้งานแล้ว เริ่ม record การออกกำลังกายและ verify ท่าของคุณได้เลย 💪'
     );

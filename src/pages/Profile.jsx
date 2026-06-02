@@ -90,7 +90,6 @@ function Profile() {
       if (!res.ok) throw new Error(data.message);
       setPwSuccess('Password changed successfully');
       setPwForm({ currentPassword: '', newPassword: '' });
-      setShowPwSection(false);
       setTimeout(() => setPwSuccess(''), 3000);
     } catch (err) {
       setPwError(err.message);

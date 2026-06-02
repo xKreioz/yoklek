@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Users, Dumbbell, ClipboardCheck, ShieldCheck, CheckCircle2, X, Trash2, ExternalLink, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 
-const API = 'http://localhost:5000/api/admin';
+import { API as BASE_API } from '../lib/api';
+const API = `${BASE_API}/admin`;
 const token = () => localStorage.getItem('token');
 
 const roleBg = { admin: '#553c9a', expert: '#276749', user: '#2d3748' };

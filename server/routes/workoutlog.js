@@ -32,14 +32,9 @@ router.get('/stats', authMiddleware, async (req, res) => {
     });
 
     // Unique workout days (for streak + activeDays count)
-    // Use toLocaleDateString with Thai locale to match client-side date strings (avoids UTC timezone shift)
     const toLocalISO = (d) => {
       const dt = new Date(d);
-      return [
-        dt.getFullYear(),
-        String(dt.getMonth() + 1).padStart(2, '0'),
-        String(dt.getDate()).padStart(2, '0'),
-      ].join('-');
+      return [dt.getUTCFullYear(), String(dt.getUTCMonth() + 1).padStart(2, '0'), String(dt.getUTCDate()).padStart(2, '0')].join('-');
     };
     const dayStrings = [...new Set(
       logs.map(l => toLocalISO(l.date))
@@ -179,7 +174,7 @@ router.post('/', authMiddleware, async (req, res) => {
     const allLogs = await WorkoutLog.find({ userId: req.user.userId }).lean();
     const uniqueDays = new Set(allLogs.map(l => {
       const d = new Date(l.date);
-      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      return [d.getUTCFullYear(), String(d.getUTCMonth() + 1).padStart(2, '0'), String(d.getUTCDate()).padStart(2, '0')].join('-');
     })).size;
 
     const MILESTONES = {
@@ -188,15 +183,18 @@ router.post('/', authMiddleware, async (req, res) => {
       100: { type: 'streak_100', title: '🏆 100 วัน Legend!',             message: 'เหลือเชื่อ! 100 วันของการออกกำลังกาย คุณคือแรงบันดาลใจของทุกคน 🌟' },
     };
 
+    // Send response first — milestone notification is a side-effect and must not cause a retry-duplicate
+    res.status(201).json(log);
+
     if (MILESTONES[uniqueDays]) {
       const { type, title, message } = MILESTONES[uniqueDays];
-      const alreadySent = await Notification.findOne({ userId: req.user.userId, type });
-      if (!alreadySent) {
-        notify(req.user.userId, type, title, message);
-      }
+      // Atomic upsert — prevents duplicate milestone notification on concurrent POST requests
+      await Notification.findOneAndUpdate(
+        { userId: req.user.userId, type },
+        { $setOnInsert: { userId: req.user.userId, type, title, message } },
+        { upsert: true }
+      ).catch(err => console.error('milestone notify error:', err.message));
     }
-
-    res.status(201).json(log);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

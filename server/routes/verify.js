@@ -108,18 +108,19 @@ router.put('/:id/approve', authMiddleware, async (req, res) => {
 
     // Give badge to THIS user only (do NOT touch exercise.verified globally)
     const targetUser = await User.findById(submission.userId);
-    if (targetUser) {
+    if (targetUser && submission.exerciseId) {
+      const exerciseId = submission.exerciseId._id;
       const alreadyHasBadge = targetUser.badges.some(
-        (b) => b.exerciseId.toString() === submission.exerciseId._id.toString()
+        (b) => b.exerciseId?.toString() === exerciseId.toString()
       );
       if (!alreadyHasBadge) {
-        targetUser.badges.push({ exerciseId: submission.exerciseId._id });
+        targetUser.badges.push({ exerciseId });
         await targetUser.save();
       }
     }
 
     const exName = submission.exerciseId?.name || 'ท่าออกกำลังกาย';
-    notify(submission.userId, 'verify_approved',
+    await notify(submission.userId, 'verify_approved',
       `✅ Verified: ${exName}`,
       `ยินดีด้วย! ท่า "${exName}" ของคุณผ่านการตรวจสอบแล้ว คุณได้รับ badge เรียบร้อย 🏅`
     );
@@ -153,7 +154,7 @@ router.put('/:id/reject', authMiddleware, async (req, res) => {
     await submission.save();
 
     const exName = submission.exerciseId?.name || 'ท่าออกกำลังกาย';
-    notify(submission.userId, 'verify_rejected',
+    await notify(submission.userId, 'verify_rejected',
       `❌ ไม่ผ่าน: ${exName}`,
       `ท่า "${exName}" ยังไม่ผ่านการตรวจสอบ${feedback ? ` — Feedback: ${feedback}` : ''} ลองใหม่ได้เลยนะ!`
     );

@@ -77,13 +77,13 @@ function Storage() {
       {/* List */}
       {loading ? (
         <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>Loading...</p>
-      ) : exercises.filter(ex => !verifiedOnly || myBadges.has(ex._id)).length === 0 ? (
+      ) : exercises.filter(ex => !verifiedOnly || myBadges.has(ex._id?.toString())).length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>
           {verifiedOnly ? 'ยังไม่มีท่าที่คุณ verify แล้ว' : 'No exercises found'}
         </p>
       ) : (
         <div className="exercise-list">
-          {exercises.filter(ex => !verifiedOnly || myBadges.has(ex._id)).map((ex) => (
+          {exercises.filter(ex => !verifiedOnly || myBadges.has(ex._id?.toString())).map((ex) => (
             <div key={ex._id} className="exercise-card" onClick={() => setSelected(ex)}>
               <img src={ex.imageUrl} alt={ex.name} className="exercise-image" />
               <div className="exercise-info">
@@ -94,7 +94,7 @@ function Storage() {
                   <span style={{ fontSize: '0.65rem', color: difficultyColor[ex.difficulty], fontWeight: 600 }}>
                     {ex.difficulty}
                   </span>
-                  {myBadges.has(ex._id) && (
+                  {myBadges.has(ex._id?.toString()) && (
                     <span className="tag verified-tag">verified <CheckCircle2 size={12} /></span>
                   )}
                 </div>
@@ -107,7 +107,7 @@ function Storage() {
 
       {/* Detail Modal */}
       {selected && (
-        <ExerciseModal exercise={selected} onClose={() => setSelected(null)} isVerified={myBadges.has(selected._id)} />
+        <ExerciseModal exercise={selected} onClose={() => setSelected(null)} isVerified={myBadges.has(selected._id?.toString())} />
       )}
     </div>
   );
