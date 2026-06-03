@@ -127,10 +127,11 @@ function Profile() {
       <div className="profile-info">
         <div className="profile-avatar-container">
           <div style={{
-            width: '80px', height: '80px', borderRadius: '50%',
-            background: 'var(--accent-red)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontSize: '2rem', fontWeight: 700, color: '#fff',
+            width: '100%', height: '100%', borderRadius: '50%',
+            background: 'var(--accent-red)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '2.8rem', fontWeight: 700, color: '#fff',
+            letterSpacing: '-1px',
           }}>
             {form.firstName.charAt(0).toUpperCase()}
           </div>
