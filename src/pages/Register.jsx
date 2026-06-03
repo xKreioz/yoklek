@@ -90,9 +90,9 @@ function Register() {
           <Input type="text" placeholder="Last Name" value={form.lastName} onChange={set('lastName')} />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', width: '100%', overflow: 'hidden', maxWidth: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', width: '100%' }}>
           <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: '0.25rem' }}>Date of Birth</label>
-          <Input type="date" value={form.birthDate} onChange={setBirthDate} max={today} style={{ width: '100%', maxWidth: '100%', display: 'block' }} />
+          <Input type="date" value={form.birthDate} onChange={setBirthDate} max={today} />
         </div>
 
         <Select
