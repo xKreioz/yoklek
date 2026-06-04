@@ -18,9 +18,20 @@ export function AuthProvider({ children }) {
       });
       if (res.ok) {
         const data = await res.json();
-        const updated = { id: data._id, email: data.email, firstName: data.firstName, lastName: data.lastName, role: data.role, badges: data.badges };
-        localStorage.setItem('user', JSON.stringify(updated));
-        setUser(updated);
+        // merge กับ user เดิม ไม่ให้ field อื่น (เช่น weight/height) หายไป
+        setUser((prev) => {
+          const merged = {
+            ...prev,
+            id: data._id,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            role: data.role,
+            badges: data.badges,
+          };
+          localStorage.setItem('user', JSON.stringify(merged));
+          return merged;
+        });
       }
     } catch {}
   };
