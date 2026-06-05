@@ -1,0 +1,1212 @@
+openapi: 3.0.3
+info:
+  title: YOKLEK API
+  version: 1.0.0
+  description: >
+    REST API สำหรับแอป YOKLEK (fitness tracker) — ครอบคลุมระบบสมาชิก (พร้อม 2FA ทางอีเมล),
+    คลังท่าออกกำลังกาย, การบันทึกการเล่น (workout logs), ระบบ verify ท่า/สมัคร expert,
+    การแจ้งเตือน และฟังก์ชันฝั่ง admin.
+
+    การยืนยันตัวตนใช้ JWT แบบ Bearer token (ใส่ใน header `Authorization: Bearer <token>`).
+    Token ได้จาก /auth/register, /auth/login (เมื่อไม่ต้อง 2FA) หรือ /auth/verify-2fa.
+
+servers:
+  - url: http://localhost:5000/api
+    description: Local development
+  - url: https://your-api.onrender.com/api
+    description: Production (Render)
+
+tags:
+  - name: Auth
+    description: สมัคร / เข้าสู่ระบบ / 2FA / โปรไฟล์
+  - name: Exercises
+    description: คลังท่าออกกำลังกาย (public อ่านได้)
+  - name: WorkoutLogs
+    description: บันทึกการออกกำลังกาย + สถิติ
+  - name: Verify
+    description: ส่งวิดีโอ verify ท่า + สมัครเป็น expert
+  - name: Notifications
+    description: การแจ้งเตือน
+  - name: Admin
+    description: ฟังก์ชันสำหรับ admin เท่านั้น
+  - name: System
+    description: health check
+
+# ─────────────────────────────────────────────────────────────────────────────
+security:
+  - bearerAuth: []
+
+paths:
+  # ── SYSTEM ──────────────────────────────────────────────────────────────────
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: เซิร์ฟเวอร์ทำงานปกติ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+  # ── AUTH ────────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: สมัครสมาชิกใหม่
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, firstName, lastName]
+              properties:
+                email:     { type: string, format: email }
+                password:  { type: string, minLength: 6 }
+                firstName: { type: string }
+                lastName:  { type: string }
+                birthDate: { type: string, format: date }
+                gender:    { type: string, enum: [male, female, other] }
+                weight:    { type: number }
+                height:    { type: number }
+      responses:
+        '201':
+          description: สมัครสำเร็จ คืน JWT
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: อีเมลถูกใช้แล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: เข้าสู่ระบบ (step 1 — ตรวจรหัสผ่าน อาจต้องทำ 2FA ต่อ)
+      description: >
+        ถ้าอีเมลอยู่ใน OTP_BYPASS list หรืออุปกรณ์เคยจำไว้ (deviceToken ยังไม่หมดอายุ)
+        จะคืน JWT ทันที. มิฉะนั้นจะส่ง OTP เข้าอีเมลและคืน `{ requires2fa: true }`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:       { type: string, format: email }
+                password:    { type: string }
+                deviceToken: { type: string, description: token ของอุปกรณ์ที่เคยจำไว้ (ถ้ามี) }
+      responses:
+        '200':
+          description: สำเร็จ — ได้ JWT เลย หรือ ต้องทำ 2FA ต่อ
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AuthResponse'
+                  - type: object
+                    properties:
+                      requires2fa: { type: boolean, example: true }
+                      email:       { type: string, format: email }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: อีเมลหรือรหัสผ่านไม่ถูกต้อง
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /auth/verify-2fa:
+    post:
+      tags: [Auth]
+      summary: ยืนยัน OTP (step 2) → คืน JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email:          { type: string, format: email }
+                code:           { type: string, description: OTP 6 หลัก }
+                rememberDevice: { type: boolean, description: จำอุปกรณ์ 30 วัน (ข้าม 2FA ครั้งต่อไป) }
+      responses:
+        '200':
+          description: ยืนยันสำเร็จ
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AuthResponse'
+                  - type: object
+                    properties:
+                      deviceToken: { type: string, description: คืนเมื่อ rememberDevice=true }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: รหัส OTP ไม่ถูกต้อง
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: กรอกผิดเกิน 5 ครั้ง
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/resend-otp:
+    post:
+      tags: [Auth]
+      summary: ส่ง OTP ใหม่
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: ขอลิงก์รีเซ็ตรหัสผ่าน (ส่งทางอีเมล)
+      description: ตอบ 200 เสมอเพื่อกันการเดาว่ามีอีเมลในระบบไหม
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: ตั้งรหัสผ่านใหม่ด้วย token จากอีเมล
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:    { type: string }
+                password: { type: string, minLength: 6 }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '400':
+          description: token ไม่ถูกต้อง/หมดอายุ หรือรหัสสั้นเกินไป
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: ข้อมูลผู้ใช้ปัจจุบัน
+      responses:
+        '200':
+          description: ข้อมูล user (ไม่รวม password)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /auth/profile:
+    put:
+      tags: [Auth]
+      summary: แก้ไขโปรไฟล์ตัวเอง
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string }
+                lastName:  { type: string }
+                username:  { type: string }
+                email:     { type: string, format: email }
+                birthDate: { type: string, format: date }
+                gender:    { type: string, enum: [male, female, other] }
+                weight:    { type: number }
+                height:    { type: number }
+                goalDays:  { type: integer }
+      responses:
+        '200':
+          description: โปรไฟล์ที่อัปเดตแล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: อีเมลถูกใช้แล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/profile/password:
+    put:
+      tags: [Auth]
+      summary: เปลี่ยนรหัสผ่าน
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword:     { type: string, minLength: 6 }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: รหัสผ่านปัจจุบันไม่ถูกต้อง
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/exercise-goal:
+    put:
+      tags: [Auth]
+      summary: ตั้ง/อัปเดตเป้าน้ำหนักของท่าหนึ่ง (upsert)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exerciseId]
+              properties:
+                exerciseId: { type: string }
+                goalWeight: { type: number }
+      responses:
+        '200':
+          description: รายการเป้าหมายล่าสุด
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  goals:
+                    type: array
+                    items: { $ref: '#/components/schemas/Goal' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── EXERCISES ───────────────────────────────────────────────────────────────
+  /exercises:
+    get:
+      tags: [Exercises]
+      summary: รายการท่าออกกำลังกาย (ค้นหา + กรอง)
+      security: []
+      parameters:
+        - { in: query, name: search,      schema: { type: string }, description: ค้นจาก name/nameEn/description }
+        - { in: query, name: muscleGroup, schema: { type: string, enum: [All, Arm, Chest, Leg, Back, Shoulder] } }
+        - { in: query, name: verified,    schema: { type: string, enum: ['true'] }, description: เฉพาะท่าที่ verified }
+        - { in: query, name: difficulty,  schema: { type: string, enum: [beginner, intermediate, advanced] } }
+      responses:
+        '200':
+          description: รายการท่า
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Exercise' }
+    post:
+      tags: [Exercises]
+      summary: สร้างท่าใหม่ (ผู้ใช้ที่ login)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExerciseInput' }
+      responses:
+        '201':
+          description: สร้างสำเร็จ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exercise' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /exercises/{id}:
+    get:
+      tags: [Exercises]
+      summary: รายละเอียดท่าเดียว
+      security: []
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      responses:
+        '200':
+          description: รายละเอียดท่า
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exercise' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── WORKOUT LOGS ────────────────────────────────────────────────────────────
+  /workoutlogs/stats:
+    get:
+      tags: [WorkoutLogs]
+      summary: สรุปสถิติของผู้ใช้ปัจจุบัน (streak, น้ำหนักรวม, best per exercise, badges)
+      responses:
+        '200':
+          description: สถิติรวม
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Stats' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /workoutlogs:
+    get:
+      tags: [WorkoutLogs]
+      summary: รายการ workout log ของผู้ใช้ (กรองวันได้)
+      parameters:
+        - { in: query, name: date, schema: { type: string, format: date }, description: 'กรองเฉพาะวันที่ (YYYY-MM-DD)' }
+      responses:
+        '200':
+          description: รายการ log
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WorkoutLog' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [WorkoutLogs]
+      summary: บันทึกการออกกำลังกาย (อาจ trigger streak milestone notification)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, exercises]
+              properties:
+                date: { type: string, format: date }
+                exercises:
+                  type: array
+                  items:
+                    type: object
+                    required: [exerciseId, exerciseName, sets]
+                    properties:
+                      exerciseId:   { type: string }
+                      exerciseName: { type: string }
+                      goal:         { type: number }
+                      sets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            reps:   { type: number }
+                            weight: { type: number }
+      responses:
+        '201':
+          description: บันทึกสำเร็จ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutLog' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /workoutlogs/{id}:
+    delete:
+      tags: [WorkoutLogs]
+      summary: ลบ workout log (เจ้าของเท่านั้น)
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── VERIFY ──────────────────────────────────────────────────────────────────
+  /verify/submit:
+    post:
+      tags: [Verify]
+      summary: ส่งวิดีโอ verify ท่า
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exerciseId, videoUrl]
+              properties:
+                exerciseId: { type: string }
+                videoUrl:   { type: string }
+                note:       { type: string }
+      responses:
+        '201':
+          description: ส่งสำเร็จ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VerificationSubmission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: มีคำขอ pending สำหรับท่านี้อยู่แล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /verify/my-submissions:
+    get:
+      tags: [Verify]
+      summary: ประวัติคำขอ verify ของตัวเอง
+      responses:
+        '200':
+          description: รายการคำขอ
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/VerificationSubmission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /verify/pending:
+    get:
+      tags: [Verify]
+      summary: คำขอ verify ที่รอตรวจ (expert/admin)
+      responses:
+        '200':
+          description: รายการ pending
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/VerificationSubmission' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /verify/{id}/approve:
+    put:
+      tags: [Verify]
+      summary: อนุมัติคำขอ verify (expert/admin) → ผู้ส่งได้ badge
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                feedback: { type: string }
+      responses:
+        '200':
+          description: อนุมัติสำเร็จ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:    { type: string }
+                  submission: { $ref: '#/components/schemas/VerificationSubmission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /verify/{id}/reject:
+    put:
+      tags: [Verify]
+      summary: ปฏิเสธคำขอ verify (expert/admin)
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                feedback: { type: string }
+      responses:
+        '200':
+          description: ปฏิเสธสำเร็จ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:    { type: string }
+                  submission: { $ref: '#/components/schemas/VerificationSubmission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /verify/apply-expert:
+    post:
+      tags: [Verify]
+      summary: ยื่นใบสมัครเป็น expert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [experience]
+              properties:
+                experience:     { type: string }
+                certifications: { type: string }
+                videoUrl:       { type: string }
+                links:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      label: { type: string }
+                      url:   { type: string }
+                certImageUrls:
+                  type: array
+                  items: { type: string }
+      responses:
+        '201':
+          description: ยื่นสำเร็จ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExpertApplication' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: มีใบสมัคร pending อยู่แล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /verify/my-expert-application:
+    get:
+      tags: [Verify]
+      summary: สถานะใบสมัคร expert ล่าสุดของตัวเอง
+      responses:
+        '200':
+          description: ใบสมัครล่าสุด (หรือ null)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ExpertApplication'
+                  - type: 'null'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /verify/expert-applications:
+    get:
+      tags: [Verify]
+      summary: รายการใบสมัคร expert ที่ pending (admin)
+      responses:
+        '200':
+          description: รายการใบสมัคร
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ExpertApplication' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /verify/expert-applications/{id}/approve:
+    put:
+      tags: [Verify]
+      summary: อนุมัติใบสมัคร expert (admin) → เปลี่ยน role เป็น expert
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── NOTIFICATIONS ───────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: รายการแจ้งเตือน (สร้าง daily motivation อัตโนมัติวันละ 1)
+      responses:
+        '200':
+          description: รายการแจ้งเตือน (สูงสุด 50)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: จำนวนที่ยังไม่อ่าน (สำหรับ badge)
+      responses:
+        '200':
+          description: จำนวน
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/read-all:
+    put:
+      tags: [Notifications]
+      summary: ทำเครื่องหมายอ่านทั้งหมด
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/{id}/read:
+    put:
+      tags: [Notifications]
+      summary: ทำเครื่องหมายอ่านรายการเดียว
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ── ADMIN ───────────────────────────────────────────────────────────────────
+  /admin/stats:
+    get:
+      tags: [Admin]
+      summary: ภาพรวมระบบ (จำนวน user/exercise/คำขอ pending)
+      responses:
+        '200':
+          description: สถิติภาพรวม
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:              { type: integer }
+                  exercises:          { type: integer }
+                  pendingSubmissions: { type: integer }
+                  pendingExperts:     { type: integer }
+                  totalExperts:       { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: รายชื่อผู้ใช้ (ค้นหา + แบ่งหน้า)
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: page,   schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,  schema: { type: integer, default: 10 } }
+        - { in: query, name: role,   schema: { type: string, enum: [user, expert, admin] } }
+        - { in: query, name: sort,   schema: { type: string, enum: [newest, oldest, az, za], default: newest } }
+      responses:
+        '200':
+          description: รายการผู้ใช้ + จำนวนรวม
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/User'
+                        - type: object
+                          properties:
+                            workoutCount: { type: integer }
+                            lastActive:   { type: string, format: date-time, nullable: true }
+                  total: { type: integer }
+                  pages: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users/{id}/stats:
+    get:
+      tags: [Admin]
+      summary: รายละเอียดผู้ใช้ + วันที่ active 90 วัน + log ล่าสุด 20 รายการ
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      responses:
+        '200':
+          description: รายละเอียดผู้ใช้
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  activeDates:
+                    type: array
+                    items: { type: string, format: date }
+                  recentLogs:
+                    type: array
+                    items: { $ref: '#/components/schemas/WorkoutLog' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/users/{id}/profile:
+    put:
+      tags: [Admin]
+      summary: แก้ไขโปรไฟล์ผู้ใช้ (admin)
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string }
+                lastName:  { type: string }
+                username:  { type: string }
+                email:     { type: string, format: email }
+                birthDate: { type: string, format: date }
+                gender:    { type: string, enum: [male, female, other] }
+                weight:    { type: number }
+                height:    { type: number }
+      responses:
+        '200':
+          description: ผู้ใช้ที่อัปเดตแล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: อีเมลถูกใช้แล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /admin/users/{id}/role:
+    put:
+      tags: [Admin]
+      summary: เปลี่ยน role ผู้ใช้
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [user, expert, admin] }
+      responses:
+        '200':
+          description: ผู้ใช้ที่อัปเดตแล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/expert-applications:
+    get:
+      tags: [Admin]
+      summary: ใบสมัคร expert ทั้งหมด (ทุกสถานะ)
+      responses:
+        '200':
+          description: รายการใบสมัคร
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ExpertApplication' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/expert-applications/{id}/approve:
+    put:
+      tags: [Admin]
+      summary: อนุมัติใบสมัคร expert + แจ้งเตือนผู้ใช้
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/expert-applications/{id}/reject:
+    put:
+      tags: [Admin]
+      summary: ปฏิเสธใบสมัคร expert + แจ้งเตือนผู้ใช้
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reviewNote: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/exercises:
+    get:
+      tags: [Admin]
+      summary: รายการท่า (admin — แบ่งหน้า + นับผู้ใช้ที่ verified)
+      parameters:
+        - { in: query, name: search,      schema: { type: string } }
+        - { in: query, name: page,        schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,       schema: { type: integer, default: 10 } }
+        - { in: query, name: muscleGroup, schema: { type: string, enum: [Arm, Chest, Leg, Back, Shoulder] } }
+        - { in: query, name: status,      schema: { type: string, enum: [published, draft] } }
+        - { in: query, name: sort,        schema: { type: string, enum: [newest, oldest, az, za], default: newest } }
+      responses:
+        '200':
+          description: รายการท่า + จำนวนรวม
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exercises:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Exercise'
+                        - type: object
+                          properties:
+                            verifiedUsers: { type: integer }
+                  total: { type: integer }
+                  pages: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Admin]
+      summary: สร้างท่าใหม่ (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExerciseInput' }
+      responses:
+        '201':
+          description: สร้างสำเร็จ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exercise' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/exercises/{id}:
+    put:
+      tags: [Admin]
+      summary: แก้ไขท่า (admin)
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExerciseInput' }
+      responses:
+        '200':
+          description: ท่าที่อัปเดตแล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exercise' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Admin]
+      summary: ลบท่า (admin)
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/exercises/{id}/toggle-verified:
+    put:
+      tags: [Admin]
+      summary: สลับสถานะ verified ของท่า
+      parameters: [ { $ref: '#/components/parameters/IdParam' } ]
+      responses:
+        '200':
+          description: ท่าที่อัปเดตแล้ว
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exercise' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/submissions:
+    get:
+      tags: [Admin]
+      summary: คำขอ verify ทั้งหมด (ทุกสถานะ)
+      responses:
+        '200':
+          description: รายการคำขอ
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/VerificationSubmission' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+# ─────────────────────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdParam:
+      in: path
+      name: id
+      required: true
+      schema: { type: string }
+      description: MongoDB ObjectId
+
+  responses:
+    Message:
+      description: ข้อความผลลัพธ์
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+    BadRequest:
+      description: ข้อมูลที่ส่งมาไม่ถูกต้อง
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: ไม่มี token หรือ token ไม่ถูกต้อง/หมดอายุ
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: ไม่มีสิทธิ์ (ต้องเป็น expert/admin)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: ไม่พบข้อมูล
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServerError:
+      description: ข้อผิดพลาดภายในเซิร์ฟเวอร์
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        message: { type: string }
+        error:   { type: string }
+
+    AuthResponse:
+      type: object
+      properties:
+        token: { type: string, description: JWT (อายุ 7 วัน) }
+        user:  { $ref: '#/components/schemas/PublicUser' }
+
+    PublicUser:
+      type: object
+      properties:
+        id:        { type: string }
+        email:     { type: string, format: email }
+        firstName: { type: string }
+        lastName:  { type: string }
+        role:      { type: string, enum: [user, expert, admin] }
+
+    User:
+      type: object
+      properties:
+        _id:       { type: string }
+        email:     { type: string, format: email }
+        username:  { type: string }
+        firstName: { type: string }
+        lastName:  { type: string }
+        birthDate: { type: string, format: date-time }
+        gender:    { type: string, enum: [male, female, other] }
+        weight:    { type: number }
+        height:    { type: number }
+        role:      { type: string, enum: [user, expert, admin] }
+        goalDays:  { type: integer }
+        badges:
+          type: array
+          items: { $ref: '#/components/schemas/Badge' }
+        goals:
+          type: array
+          items: { $ref: '#/components/schemas/Goal' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Badge:
+      type: object
+      properties:
+        exerciseId: { type: string }
+        earnedAt:   { type: string, format: date-time }
+
+    Goal:
+      type: object
+      properties:
+        exerciseId: { type: string }
+        goalWeight: { type: number }
+
+    Exercise:
+      type: object
+      properties:
+        _id:            { type: string }
+        name:           { type: string }
+        nameEn:         { type: string }
+        muscleGroup:
+          type: array
+          items: { type: string, enum: [Arm, Chest, Leg, Back, Shoulder] }
+        difficulty:     { type: string, enum: [beginner, intermediate, advanced] }
+        description:    { type: string }
+        steps:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+        imageUrl:       { type: string }
+        youtubeVideoId: { type: string }
+        verified:       { type: boolean }
+        createdBy:      { type: string }
+        createdAt:      { type: string, format: date-time }
+        updatedAt:      { type: string, format: date-time }
+
+    ExerciseInput:
+      type: object
+      required: [name]
+      properties:
+        name:           { type: string }
+        nameEn:         { type: string }
+        muscleGroup:
+          type: array
+          items: { type: string, enum: [Arm, Chest, Leg, Back, Shoulder] }
+        difficulty:     { type: string, enum: [beginner, intermediate, advanced] }
+        description:    { type: string }
+        steps:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+        imageUrl:       { type: string }
+        youtubeVideoId: { type: string }
+        verified:       { type: boolean }
+
+    WorkoutSet:
+      type: object
+      properties:
+        reps:   { type: number }
+        weight: { type: number }
+
+    WorkoutLog:
+      type: object
+      properties:
+        _id:    { type: string }
+        userId: { type: string }
+        date:   { type: string, format: date-time }
+        exercises:
+          type: array
+          items:
+            type: object
+            properties:
+              exerciseId:   { type: string }
+              exerciseName: { type: string }
+              goal:         { type: number }
+              sets:
+                type: array
+                items: { $ref: '#/components/schemas/WorkoutSet' }
+        createdAt: { type: string, format: date-time }
+
+    Stats:
+      type: object
+      properties:
+        totalWorkouts: { type: integer }
+        dayStreak:     { type: integer }
+        totalWeight:   { type: integer }
+        totalSets:     { type: integer }
+        activeDays:    { type: integer }
+        goalDays:      { type: integer }
+        badges:
+          type: array
+          items:
+            type: object
+            properties:
+              exerciseId:   { type: string }
+              exerciseName: { type: string }
+              earnedAt:     { type: string, format: date-time }
+        bestStats:
+          type: array
+          items:
+            type: object
+            properties:
+              exerciseName: { type: string }
+              exerciseId:   { type: string, nullable: true }
+              maxWeight:    { type: number }
+              goalWeight:   { type: number }
+              imageUrl:     { type: string, nullable: true }
+
+    VerificationSubmission:
+      type: object
+      properties:
+        _id:        { type: string }
+        userId:     { type: string }
+        exerciseId: { type: string }
+        videoUrl:   { type: string }
+        note:       { type: string }
+        status:     { type: string, enum: [pending, approved, rejected] }
+        reviewedBy: { type: string, nullable: true }
+        feedback:   { type: string }
+        reviewedAt: { type: string, format: date-time, nullable: true }
+        createdAt:  { type: string, format: date-time }
+
+    ExpertApplication:
+      type: object
+      properties:
+        _id:    { type: string }
+        userId: { type: string }
+        videoUrl: { type: string }
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              label: { type: string }
+              url:   { type: string }
+        certImageUrls:
+          type: array
+          items: { type: string }
+        experience:     { type: string }
+        certifications: { type: string }
+        status:         { type: string, enum: [pending, approved, rejected] }
+        reviewedBy:     { type: string, nullable: true }
+        reviewNote:     { type: string }
+        createdAt:      { type: string, format: date-time }
+
+    Notification:
+      type: object
+      properties:
+        _id:     { type: string }
+        userId:  { type: string }
+        type:
+          type: string
+          enum: [welcome, verify_approved, verify_rejected, expert_approved,
+                 expert_rejected, streak_7, streak_30, streak_100, daily_motivation]
+        title:   { type: string }
+        message: { type: string }
+        read:    { type: boolean }
+        createdAt: { type: string, format: date-time }

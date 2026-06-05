@@ -9,6 +9,7 @@ const verifyRoutes       = require('./routes/verify');
 const adminRoutes        = require('./routes/admin');
 const workoutRoutes      = require('./routes/workoutlog');
 const notificationRoutes = require('./routes/notifications');
+const { mountSwagger } = require('./swagger');
 
 const app = express();
 
@@ -30,6 +31,9 @@ app.use('/api/workoutlogs',  workoutRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+// API documentation (Swagger UI) → http://localhost:5000/api/docs
+mountSwagger(app);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
